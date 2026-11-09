@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaffeekasse Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background-color: #1e293b; color: #f8fafc; }
+        .container { max-width: 500px; margin: 0 auto; background: #334155; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        h1 { text-align: center; color: #38bdf8; margin-bottom: 20px; font-size: 22px; }
+        h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid #475569; padding-bottom: 5px; margin-top: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #cbd5e1; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 15px; box-sizing: border-box; }
+        .flex-group { display: flex; align-items: center; gap: 10px; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; min-width: 44px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #475569; transition: .3s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%; }
+        input:checked + .slider { background-color: #38bdf8; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .btn-save { width: 100%; padding: 15px; background: #0284c7; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-save:hover { background: #0369a1; }
+        .status { padding: 12px; border-radius: 6px; text-align: center; font-weight: bold; margin-top: 15px; display: none; font-size: 14px; }
+        .status-success { background: #16a34a; color: white; }
+        .status-error { background: #dc2626; color: white; }
+        .price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .logout-link { display: block; text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8; cursor: pointer; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🛠️ Kaffeekasse Admin-Panel</h1>
+    <div id="statusBox" class="status"></div>
+
+    <div id="adminForm">
+        <h2>🎉 Freikaffee / Geburtstag</h2>
+        <div class="form-group flex-group">
+            <label class="switch">
+                <input type="checkbox" id="freeCoffeeActive">
+                <span class="slider"></span>
+            </label>
+            <span>Aktion aktiv (Kaffee für alle GRATIS)</span>
+        </div>
+        <div class="form-group">
+            <label for="freeCoffeeGiver">Name des Geburtstagskinds / Spenders:</label>
+            <input type="text" id="freeCoffeeGiver" placeholder="z. B. Max Mustermann">
+        </div>
+
+        <h2>📢 Nachricht an alle</h2>
+        <div class="form-group flex-group">
+            <label class="switch">
+                <input type="checkbox" id="msgActive">
+                <span class="slider"></span>
+            </label>
+            <span>Nachricht einblenden</span>
+        </div>
+        <div class="form-group">
+            <label for="msgText">Nachrichten-Text:</label>
+            <input type="text" id="msgText" placeholder="z. B. Bitte Kaffeemaschine reinigen!">
+        </div>
+        <div class="form-group">
+            <label for="msgColor">Banner-Farbe:</label>
+            <select id="msgColor">
+                <option value="blue">Info-Blau</option>
+                <option value="red">Warnung-Rot</option>
+            </select>
+        </div>
+
+        <h2>☕ Live-Preise ändern (€)</h2>
+        <div class="price-grid">
+            <div class="form-group"><label>Kaffee:</label><input type="number" step="0.01" id="p_kaffee"></div>
+            <div class="form-group"><label>Cappuccino:</label><input type="number" step="0.01" id="p_cappuccino"></div>
+            <div class="form-group"><label>Wasser 0.7L:</label><input type="number" step="0.01" id="p_wasser"></div>
+            <div class="form-group"><label>Softdrink 0.33L:</label><input type="number" step="0.01" id="p_soft33"></div>
+            <div class="form-group"><label>Softdrink 0.5L:</label><input type="number" step="0.01" id="p_soft5"></div>
+            <div class="form-group"><label>Schokoriegel kl.:</label><input type="number" step="0.01" id="p_schokokl"></div>
+            <div class="form-group"><label>Schokoriegel gr.:</label><input type="number" step="0.01" id="p_schokogr"></div>
+            <div class="form-group"><label>Eiscreme:</label><input type="number" step="0.01" id="p_eis"></div>
+            <div class="form-group"><label>Frühstück:</label><input type="number" step="0.01" id="p_fruehstueck"></div>
+        </div>
+
+        <button class="btn-save" onclick="saveAndPushConfig()">💾 Speichern & Live schalten</button>
+        <span class="logout-link" onclick="clearCredentials()">GitHub-Zugangsdaten zurücksetzen</span>
+    </div>
+</div>
+<script>
+    let githubToken = "";
+    let githubUser = "";
+    let githubRepo = "";
+    const configPath = "config.json";
+    let currentSha = "";
+
+    function checkCredentials() {
+        githubToken = localStorage.getItem('kk_admin_token');
+        githubUser = localStorage.getItem('kk_admin_user');
+        githubRepo = localStorage.getItem('kk_admin_repo');
+
+        if (!githubToken || !githubUser || !githubRepo) {
+            let tInput = prompt("Bitte gib deinen GitHub Personal Access Token (PAT) ein:", githubToken || "");
+            let uInput = prompt("Bitte gib deinen GitHub-Benutzernamen ein:", githubUser || "");
+            let rInput = prompt("Bitte gib den Namen deines Kaffeekassen-Repositorys ein:", githubRepo || "");
+
+            if (tInput && uInput && rInput && tInput.trim() !== "" && uInput.trim() !== "" && rInput.trim() !== "") {
+                localStorage.setItem('kk_admin_token', tInput.trim());
+                localStorage.setItem('kk_admin_user', uInput.trim());
+                localStorage.setItem('kk_admin_repo', rInput.trim());
+                
+                location.reload(); 
+                return false;
+            } else {
+                showStatus("Einrichtung unvollständig! Bitte lade die Seite neu, um es erneut zu versuchen.", false);
+                document.getElementById('adminForm').innerHTML = `
+                    <div style="text-align:center; margin-top:30px;">
+                        <button class="btn-save" onclick="location.reload()" style="background:#dc2626;">🔄 Jetzt neu einrichten</button>
+                    </div>`;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    async function loadCurrentConfig() {
+        if (!checkCredentials()) return;
+        showStatus("Lade aktuelle Live-Daten...", true);
+
+        // KORREKTUR: .toLowerCase() sorgt dafür, dass die GitHub-API den Pfad von lokalen Geräten akzeptiert!
+        const apiUser = githubUser.toLowerCase().trim();
+        const apiRepo = githubRepo.toLowerCase().trim();
+        const cacheBuster = Date.now();
+        
+        const url = `https://github.com{apiUser}/${apiRepo}/contents/${configPath}?cb=${cacheBuster}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: "GET",
+                headers: { 
+                    "Authorization": `token ${githubToken}`, 
+                    "Accept": "application/vnd.github.v3+json",
+                    "Cache-Control": "no-cache"
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                currentSha = data.sha;
+                const config = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+
+                document.getElementById('freeCoffeeActive').checked = config.freeCoffee?.active || false;
+                document.getElementById('freeCoffeeGiver').value = config.freeCoffee?.giver || "";
+                document.getElementById('msgActive').checked = config.message?.active || false;
+                document.getElementById('msgText').value = config.message?.text || "";
+                document.getElementById('msgColor').value = config.message?.color || "blue";
+
+                if (config.prices) {
+                    for (const key in config.prices) {
+                        const input = document.getElementById(`p_${key}`);
+                        if (input) input.value = config.prices[key];
+                    }
+                }
+                showStatus("Live-Daten erfolgreich geladen.", true);
+                setTimeout(() => document.getElementById('statusBox').style.display = "none", 2000);
+            } else {
+                const errData = await response.json();
+                showStatus(`GitHub-Fehler: ${response.status} - ${errData.message}`, false);
+            }
+        } catch (e) {
+            showStatus(`Verbindungsfehler: Bitte überprüfe deine Internetverbindung.`, false);
+        }
+    }
+
+    async function saveAndPushConfig() {
+        showStatus("Synchronisiere mit GitHub...", true);
+
+        const updatedConfig = {
+            freeCoffee: {
+                active: document.getElementById('freeCoffeeActive').checked,
+                giver: document.getElementById('freeCoffeeGiver').value.trim()
+            },
+            message: {
+                active: document.getElementById('msgActive').checked,
+                text: document.getElementById('msgText').value.trim(),
+                color: document.getElementById('msgColor').value
+            },
+            prices: {
+                kaffee: parseFloat(document.getElementById('p_kaffee').value) || 0.50,
+                cappuccino: parseFloat(document.getElementById('p_cappuccino').value) || 0.60,
+                wasser: parseFloat(document.getElementById('p_wasser').value) || 0.60,
+                soft33: parseFloat(document.getElementById('p_soft33').value) || 0.90,
+                soft5: parseFloat(document.getElementById('p_soft5').value) || 0.90,
+                schokokl: parseFloat(document.getElementById('p_schokokl').value) || 0.30,
+                schokogr: parseFloat(document.getElementById('p_schokogr').value) || 0.60,
+                eis: parseFloat(document.getElementById('p_eis').value) || 0.50,
+                fruehstueck: parseFloat(document.getElementById('p_fruehstueck').value) || 4.00
+            }
+        };
+
+        const apiUser = githubUser.toLowerCase().trim();
+        const apiRepo = githubRepo.toLowerCase().trim();
+        const url = `https://github.com{apiUser}/${apiRepo}/contents/${configPath}`;
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedConfig, null, 2))));
+
+        const body = {
+            message: "Update config.json via Kaffeekasse Admin-App",
+            content: contentBase64
+        };
+        if (currentSha) body.sha = currentSha;
+
+        try {
+            const response = await fetch(url, {
+                method: "PUT",
+                headers: { 
+                    "Authorization": `token ${githubToken}`, 
+                    "Content-Type": "application/json" 
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                const resData = await response.json();
+                currentSha = resData.content.sha;
+                showStatus("🎉 Live geschaltet! Änderungen in ca. 30 Sek. aktiv.", true);
+            } else {
+                const err = await response.json();
+                showStatus(`Fehler beim Speichern: ${err.message}`, false);
+            }
+        } catch (e) {
+            showStatus("Netzwerkfehler beim Push zu GitHub.", false);
+        }
+    }
+
+    function clearCredentials() {
+        if (confirm("Möchtest du die GitHub-Zugangsdaten wirklich löschen?")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function showStatus(msg, isSuccess) {
+        const box = document.getElementById('statusBox');
+        box.innerHTML = msg;
+        box.style.display = "block";
+        box.className = "status " + (isSuccess ? "status-success" : "status-error");
+    }
+
+    window.onload = loadCurrentConfig;
+</script>
