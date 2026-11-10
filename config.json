@@ -1,23 +1,23 @@
 {
   "geburtstag": {
-    "aktiv": true,
-    "spender": "peter",
+    "aktiv": false,
+    "spender": "",
     "datum": "2026-11-10"
   },
   "nachricht": {
-    "aktiv": true,
-    "text": "Diese naCHRICHZ",
+    "aktiv": false,
+    "text": "",
     "typ": "info"
   },
   "preise": {
-    "btn-kaffee": 0.37,
-    "btn-cappuccino": 0.6,
-    "btn-wasser": 0.17,
-    "btn-soft33": 0.12,
-    "btn-soft5": 0.15,
-    "btn-schokokl": 0.27,
-    "btn-schokogr": 0.15,
-    "btn-eis": 0.14,
-    "btn-fruehstueck": 7
+    "btn-kaffee": 0,
+    "btn-cappuccino": 0,
+    "btn-wasser": 0,
+    "btn-soft33": 0,
+    "btn-soft5": 0,
+    "btn-schokokl": 0,
+    "btn-schokogr": 0,
+    "btn-eis": 0,
+    "btn-fruehstueck": 0
   }
 }
