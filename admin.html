@@ -82,167 +82,149 @@
         </div>
 
         <button class="btn-save" onclick="saveAndPushConfig()">💾 Speichern & Live schalten</button>
-        <span class="logout-link" onclick="clearCredentials()">GitHub-Zugangsdaten zurücksetzen</span>
+        <span class="logout-link" onclick="clearCredentials()">GitHub-Token verwerfen / abmelden</span>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.45;text-align:center;">Der GitHub-Token wird nur während dieser geöffneten Admin-Sitzung im Arbeitsspeicher gehalten und nicht im Browser gespeichert. Für das Speichern wird ein Fine-grained Token mit Contents: Read and write benötigt.</p>
     </div>
 </div>
 <script>
     let githubToken = "";
-    let githubUser = "";
-    let githubRepo = "";
+    const githubUser = "SynthHunter1278";
+    const githubRepo = "Huckebein-Kaffeekasse-iPhone-Android";
     const configPath = "config.json";
     let currentSha = "";
 
     function checkCredentials() {
-        githubToken = localStorage.getItem('kk_admin_token');
-        githubUser = localStorage.getItem('kk_admin_user');
-        githubRepo = localStorage.getItem('kk_admin_repo');
-
-        if (!githubToken || !githubUser || !githubRepo) {
-            let tInput = prompt("Bitte gib deinen GitHub Personal Access Token (PAT) ein:", githubToken || "");
-            let uInput = prompt("Bitte gib deinen GitHub-Benutzernamen ein:", githubUser || "");
-            let rInput = prompt("Bitte gib den Namen deines Kaffeekassen-Repositorys ein:", githubRepo || "");
-
-            if (tInput && uInput && rInput && tInput.trim() !== "" && uInput.trim() !== "" && rInput.trim() !== "") {
-                localStorage.setItem('kk_admin_token', tInput.trim());
-                localStorage.setItem('kk_admin_user', uInput.trim());
-                localStorage.setItem('kk_admin_repo', rInput.trim());
-                
-                location.reload(); 
-                return false;
-            } else {
-                showStatus("Einrichtung unvollständig! Bitte lade die Seite neu, um es erneut zu versuchen.", false);
-                document.getElementById('adminForm').innerHTML = `
-                    <div style="text-align:center; margin-top:30px;">
-                        <button class="btn-save" onclick="location.reload()" style="background:#dc2626;">🔄 Jetzt neu einrichten</button>
-                    </div>`;
-                return false;
-            }
+        if (githubToken) return true;
+        const token = prompt("Bitte deinen GitHub Fine-grained Personal Access Token eingeben. Er wird nicht gespeichert:");
+        if (!token || !token.trim()) {
+            showStatus("Ohne GitHub-Token ist keine Administration möglich.", false);
+            document.getElementById("adminForm").style.display = "none";
+            return false;
         }
+        githubToken = token.trim();
         return true;
+    }
+
+    function apiUrl() {
+        return `https://api.github.com/repos/${githubUser}/${githubRepo}/contents/${configPath}`;
+    }
+
+    function decodeBase64Utf8(value) {
+        const bytes = Uint8Array.from(atob(value.replace(/\s/g, "")), c => c.charCodeAt(0));
+        return new TextDecoder("utf-8").decode(bytes);
     }
 
     async function loadCurrentConfig() {
         if (!checkCredentials()) return;
         showStatus("Lade aktuelle Live-Daten...", true);
-
-        // KORREKTUR: .toLowerCase() sorgt dafür, dass die GitHub-API den Pfad von lokalen Geräten akzeptiert!
-        const apiUser = githubUser.toLowerCase().trim();
-        const apiRepo = githubRepo.toLowerCase().trim();
-        const cacheBuster = Date.now();
-        
-        const url = `https://github.com{apiUser}/${apiRepo}/contents/${configPath}?cb=${cacheBuster}`;
-        
         try {
-            const response = await fetch(url, {
+            const response = await fetch(apiUrl() + "?cb=" + Date.now(), {
                 method: "GET",
-                headers: { 
-                    "Authorization": `token ${githubToken}`, 
-                    "Accept": "application/vnd.github.v3+json",
+                headers: {
+                    "Authorization": `Bearer ${githubToken}`,
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
                     "Cache-Control": "no-cache"
                 }
             });
-            
-            if (response.ok) {
-                const data = await response.json();
-                currentSha = data.sha;
-                const config = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+            currentSha = data.sha;
+            const config = JSON.parse(decodeBase64Utf8(data.content));
 
-                document.getElementById('freeCoffeeActive').checked = config.freeCoffee?.active || false;
-                document.getElementById('freeCoffeeGiver').value = config.freeCoffee?.giver || "";
-                document.getElementById('msgActive').checked = config.message?.active || false;
-                document.getElementById('msgText').value = config.message?.text || "";
-                document.getElementById('msgColor').value = config.message?.color || "blue";
+            document.getElementById("freeCoffeeActive").checked = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
+            document.getElementById("freeCoffeeGiver").value = config.geburtstag?.spender || config.freeCoffee?.giver || "";
+            document.getElementById("msgActive").checked = Boolean(config.nachricht?.aktiv ?? config.message?.active);
+            document.getElementById("msgText").value = config.nachricht?.text || config.message?.text || "";
+            document.getElementById("msgColor").value = (config.nachricht?.typ === "warnung" || config.message?.color === "red") ? "red" : "blue";
 
-                if (config.prices) {
-                    for (const key in config.prices) {
-                        const input = document.getElementById(`p_${key}`);
-                        if (input) input.value = config.prices[key];
-                    }
-                }
-                showStatus("Live-Daten erfolgreich geladen.", true);
-                setTimeout(() => document.getElementById('statusBox').style.display = "none", 2000);
-            } else {
-                const errData = await response.json();
-                showStatus(`GitHub-Fehler: ${response.status} - ${errData.message}`, false);
+            const p = config.preise || config.prices || {};
+            const mapping = { kaffee:"btn-kaffee", cappuccino:"btn-cappuccino", wasser:"btn-wasser", soft33:"btn-soft33", soft5:"btn-soft5", schokokl:"btn-schokokl", schokogr:"btn-schokogr", eis:"btn-eis", fruehstueck:"btn-fruehstueck" };
+            for (const [key,id] of Object.entries(mapping)) {
+                const value = p[id] ?? p[key];
+                if (value !== undefined) document.getElementById("p_" + key).value = Number(value).toFixed(2);
             }
+            showStatus("Live-Daten erfolgreich geladen.", true);
         } catch (e) {
-            showStatus(`Verbindungsfehler: Bitte überprüfe deine Internetverbindung.`, false);
+            showStatus("Laden fehlgeschlagen: " + e.message, false);
         }
     }
 
     async function saveAndPushConfig() {
-        showStatus("Synchronisiere mit GitHub...", true);
-
-        const updatedConfig = {
-            freeCoffee: {
-                active: document.getElementById('freeCoffeeActive').checked,
-                giver: document.getElementById('freeCoffeeGiver').value.trim()
-            },
-            message: {
-                active: document.getElementById('msgActive').checked,
-                text: document.getElementById('msgText').value.trim(),
-                color: document.getElementById('msgColor').value
-            },
-            prices: {
-                kaffee: parseFloat(document.getElementById('p_kaffee').value) || 0.50,
-                cappuccino: parseFloat(document.getElementById('p_cappuccino').value) || 0.60,
-                wasser: parseFloat(document.getElementById('p_wasser').value) || 0.60,
-                soft33: parseFloat(document.getElementById('p_soft33').value) || 0.90,
-                soft5: parseFloat(document.getElementById('p_soft5').value) || 0.90,
-                schokokl: parseFloat(document.getElementById('p_schokokl').value) || 0.30,
-                schokogr: parseFloat(document.getElementById('p_schokogr').value) || 0.60,
-                eis: parseFloat(document.getElementById('p_eis').value) || 0.50,
-                fruehstueck: parseFloat(document.getElementById('p_fruehstueck').value) || 4.00
-            }
+        if (!checkCredentials()) return;
+        const parsePrice = id => {
+            const n = Number(document.getElementById(id).value);
+            if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error("Bitte gültige Preise zwischen 0,00 und 100,00 € eingeben.");
+            return Math.round(n * 100) / 100;
         };
-
-        const apiUser = githubUser.toLowerCase().trim();
-        const apiRepo = githubRepo.toLowerCase().trim();
-        const url = `https://github.com{apiUser}/${apiRepo}/contents/${configPath}`;
-        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(updatedConfig, null, 2))));
-
-        const body = {
-            message: "Update config.json via Kaffeekasse Admin-App",
-            content: contentBase64
-        };
-        if (currentSha) body.sha = currentSha;
-
+        let updatedConfig;
         try {
-            const response = await fetch(url, {
-                method: "PUT",
-                headers: { 
-                    "Authorization": `token ${githubToken}`, 
-                    "Content-Type": "application/json" 
+            updatedConfig = {
+                geburtstag: {
+                    aktiv: document.getElementById("freeCoffeeActive").checked,
+                    spender: document.getElementById("freeCoffeeGiver").value.trim(),
+                    datum: new Date().toISOString().slice(0,10)
                 },
-                body: JSON.stringify(body)
-            });
+                nachricht: {
+                    aktiv: document.getElementById("msgActive").checked,
+                    text: document.getElementById("msgText").value.trim(),
+                    typ: document.getElementById("msgColor").value === "red" ? "warnung" : "info"
+                },
+                preise: {
+                    "btn-kaffee": parsePrice("p_kaffee"),
+                    "btn-cappuccino": parsePrice("p_cappuccino"),
+                    "btn-wasser": parsePrice("p_wasser"),
+                    "btn-soft33": parsePrice("p_soft33"),
+                    "btn-soft5": parsePrice("p_soft5"),
+                    "btn-schokokl": parsePrice("p_schokokl"),
+                    "btn-schokogr": parsePrice("p_schokogr"),
+                    "btn-eis": parsePrice("p_eis"),
+                    "btn-fruehstueck": parsePrice("p_fruehstueck")
+                }
+            };
+        } catch (e) { showStatus(e.message, false); return; }
 
-            if (response.ok) {
-                const resData = await response.json();
-                currentSha = resData.content.sha;
-                showStatus("🎉 Live geschaltet! Änderungen in ca. 30 Sek. aktiv.", true);
-            } else {
-                const err = await response.json();
-                showStatus(`Fehler beim Speichern: ${err.message}`, false);
-            }
+        showStatus("Speichere Änderungen bei GitHub...", true);
+        try {
+            // SHA frisch abrufen, damit ein zwischenzeitliches Update nicht überschrieben wird.
+            const getResponse = await fetch(apiUrl() + "?cb=" + Date.now(), {
+                headers: { "Authorization": `Bearer ${githubToken}`, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" }
+            });
+            const current = await getResponse.json();
+            if (!getResponse.ok) throw new Error(current.message || `HTTP ${getResponse.status}`);
+            currentSha = current.sha;
+
+            const contentBase64 = btoa(Array.from(new TextEncoder().encode(JSON.stringify(updatedConfig, null, 2)), b => String.fromCharCode(b)).join(""));
+            const response = await fetch(apiUrl(), {
+                method: "PUT",
+                headers: {
+                    "Authorization": `Bearer ${githubToken}`,
+                    "Accept": "application/vnd.github+json",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ message: "Kaffeekasse: config.json aktualisiert", content: contentBase64, sha: currentSha })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
+            currentSha = result.content.sha;
+            showStatus("Gespeichert! GitHub Pages veröffentlicht die neue Konfiguration nach kurzer Zeit.", true);
         } catch (e) {
-            showStatus("Netzwerkfehler beim Push zu GitHub.", false);
+            showStatus("Speichern fehlgeschlagen: " + e.message, false);
         }
     }
 
     function clearCredentials() {
-        if (confirm("Möchtest du die GitHub-Zugangsdaten wirklich löschen?")) {
-            localStorage.clear();
-            location.reload();
-        }
+        githubToken = "";
+        location.reload();
     }
 
     function showStatus(msg, isSuccess) {
-        const box = document.getElementById('statusBox');
-        box.innerHTML = msg;
+        const box = document.getElementById("statusBox");
+        box.textContent = msg;
         box.style.display = "block";
         box.className = "status " + (isSuccess ? "status-success" : "status-error");
     }
 
-    window.onload = loadCurrentConfig;
+    window.addEventListener("load", loadCurrentConfig);
 </script>

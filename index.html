@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -15,8 +15,8 @@
 
 <!-- Den Service Worker (sw.js) im Hintergrund aktivieren -->
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Service Worker:', err)));
   }
 </script>    
 <meta charset="UTF-8">
@@ -28,9 +28,9 @@
 </script>
     <script type="text/javascript">
     (function () {
-        emailjs.init({
-            publicKey: "AVgYV4iHyJiRXlYm_"
-        });
+        if (window.emailjs) {
+            emailjs.init({ publicKey: "AVgYV4iHyJiRXlYm_" });
+        }
     })();
 </script>
     <style>
@@ -78,9 +78,29 @@
         .confirm-buttons button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; }
         .btn-confirm-yes { background-color: #27ae60; color: white; }
         .btn-confirm-no { background-color: #ecf0f1; color: #7f8c8d; }
+        .access-gate { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 20px; background: #f4f6f9; }
+        .access-card { width: 100%; max-width: 390px; background: #fff; padding: 24px; border-radius: 14px; box-shadow: 0 5px 24px rgba(0,0,0,.12); text-align: center; box-sizing: border-box; }
+        .access-card h2 { color: #2c3e50; margin-top: 0; }
+        .access-card input { width: 100%; box-sizing: border-box; padding: 13px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 17px; text-align: center; letter-spacing: 1px; text-transform: uppercase; }
+        .access-card button { width: 100%; padding: 13px; margin-top: 12px; background: #2c3e50; color: white; border: 0; border-radius: 8px; font-weight: bold; font-size: 16px; }
+        .access-error { color: #b91c1c; min-height: 20px; font-size: 13px; margin-top: 10px; }
+        .access-note { font-size: 12px; color: #64748b; line-height: 1.45; margin-top: 14px; }
+        #noticeBanner { display:none; padding:12px; border-radius:8px; margin-bottom:14px; font-size:14px; font-weight:bold; }
     </style>
 </head>
-<body onload="init()">
+<body onload="startApp()">
+<div id="accessGate" class="access-gate">
+  <div class="access-card">
+    <h2>☕ Kaffeekasse</h2>
+    <p>Bitte gib den Zugangscode ein, den du von der Kaffeekassen-Administration erhalten hast.</p>
+    <form onsubmit="event.preventDefault(); unlockApp();">
+      <input id="accessCodeInput" type="password" autocomplete="one-time-code" placeholder="Zugangscode" maxlength="32" required>
+      <button type="submit">App freischalten</button>
+    </form>
+    <div id="accessError" class="access-error" role="alert"></div>
+    <div class="access-note">Der Code wird auf diesem Gerät nur einmal benötigt. Bei gelöschten Browserdaten oder einem neuen Gerät muss die Freischaltung wiederholt werden.</div>
+  </div>
+</div>
 
 <div id="confirmOverlay" class="confirm-overlay">
     <div class="confirm-box">
@@ -94,6 +114,7 @@
 
 <div class="container">
     <h1>☕ Hans Huckebein Kaffeekasse</h1>
+    <div id="noticeBanner" role="status"></div>
 
     <div class="saldo-box">
         <div class="saldo-title">Dein Guthaben</div>
@@ -142,7 +163,7 @@
     </div>
 
     <div class="footer-links">
-        Sicherungscode: <span id="backupCodeDisplay" style="font-weight: bold; color: #7f8c8d;">------</span>
+        <button type="button" onclick="logoutDevice()" style="margin-top:8px;padding:8px 12px;border:0;border-radius:6px;background:#e5e7eb;color:#374151;font-weight:bold;">Gerät abmelden</button>
         <br><br>
         
     </div>
@@ -150,14 +171,107 @@
 <script>
     const paypalMeName = "HansHuckebein699"; 
     
+    // Zugangscode-Prüfung: Nur der SHA-256-Prüfwert liegt im öffentlichen Frontend.
+    // Hinweis: Ohne Backend ist dies eine Hürde, keine echte Authentifizierung.
+    const ACCESS_CODE_HASH = "74440a01a2a67067d7c15ded82649a6200c0a63fadba6e070c1b261433a07c8e";
+    const ACCESS_STORAGE_KEY = "kk_device_access_v1";
     const CODE_MULTIPLIER = 1307;
     const DAY_MULTIPLIER = 713;
     const CODE_OFFSET = 418952;
+    const DEFAULT_PRICES = { kaffee:0.50, cappuccino:0.60, wasser:0.60, soft33:0.90, soft5:0.90, schokokl:0.30, schokogr:0.60, eis:0.50, fruehstueck:4.00 };
+    let prices = { ...DEFAULT_PRICES };
+    let birthdayCoffeeActive = false;
 
     let meinSaldo = 0.00;
     let usedCodes = [];
     let lastBreakfastWeek = ""; 
     let benutzerName = "Unbekannter Teilnehmer"; // Speichert den Namen des Gerätenutzers
+
+    async function sha256Hex(value) {
+        if (!window.crypto || !crypto.subtle) throw new Error("Sichere Codeprüfung ist in diesem Browser nicht verfügbar.");
+        const bytes = new TextEncoder().encode(value);
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function unlockApp() {
+        const input = document.getElementById("accessCodeInput");
+        const error = document.getElementById("accessError");
+        const normalized = input.value.trim().toUpperCase().replace(/[\s-]/g, "");
+        try {
+            const suppliedHash = await sha256Hex(normalized);
+            if (suppliedHash !== ACCESS_CODE_HASH) {
+                error.textContent = "Der Zugangscode ist nicht korrekt.";
+                input.select();
+                return;
+            }
+            localStorage.setItem(ACCESS_STORAGE_KEY, "1");
+            document.getElementById("accessGate").style.display = "none";
+            await loadPublicConfig();
+            init();
+        } catch (e) {
+            error.textContent = e.message || "Freischaltung nicht möglich.";
+        }
+    }
+
+    async function startApp() {
+        if (localStorage.getItem(ACCESS_STORAGE_KEY) === "1") {
+            document.getElementById("accessGate").style.display = "none";
+            await loadPublicConfig();
+            init();
+        } else {
+            document.getElementById("accessCodeInput").focus();
+        }
+    }
+
+    async function loadPublicConfig() {
+        try {
+            const response = await fetch("./config.json?cb=" + Date.now(), { cache: "no-store" });
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            const config = await response.json();
+            const sourcePrices = config.preise || config.prices || {};
+            for (const key of Object.keys(DEFAULT_PRICES)) {
+                const value = sourcePrices["btn-" + key] ?? sourcePrices[key];
+                const numeric = Number(value);
+                if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 100) prices[key] = numeric;
+            }
+            birthdayCoffeeActive = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
+            const giver = config.geburtstag?.spender || config.freeCoffee?.giver || "";
+            const message = config.nachricht || config.message;
+            const banner = document.getElementById("noticeBanner");
+            if (message?.aktiv || message?.active) {
+                banner.textContent = message.text || "";
+                banner.style.display = banner.textContent ? "block" : "none";
+                banner.style.background = (message.typ === "warnung" || message.color === "red") ? "#fee2e2" : "#dbeafe";
+                banner.style.color = (message.typ === "warnung" || message.color === "red") ? "#991b1b" : "#1e40af";
+            }
+            if (birthdayCoffeeActive) {
+                const sub = document.getElementById("saldo-subtext");
+                if (sub) sub.textContent = "Geburtstagskaffee gratis" + (giver ? " – " + giver : "");
+            }
+        } catch (e) {
+            console.warn("Konfiguration konnte nicht geladen werden; Standardpreise werden verwendet:", e);
+        }
+        applyPricesToButtons();
+    }
+
+    function getPriceForItem(itemName, fallback) {
+        const keys = { "Automaten Kaffee":"kaffee", "Cappuccino":"cappuccino", "Wasser 0,7L":"wasser", "Softdrink 0,33L":"soft33", "Softdrink 0,5L":"soft5", "Schokoriegel klein":"schokokl", "Schokoriegel groß":"schokogr", "Eiscreme":"eis", "Freitagsfrühstück":"fruehstueck" };
+        const key = keys[itemName];
+        if (key === "kaffee" && birthdayCoffeeActive) return 0;
+        return key ? prices[key] : fallback;
+    }
+
+    function applyPricesToButtons() {
+        const ids = { "btn-kaffee":"kaffee", "btn-cappuccino":"cappuccino", "btn-wasser":"wasser", "btn-soft33":"soft33", "btn-soft5":"soft5", "btn-schokokl":"schokokl", "btn-schokogr":"schokogr", "btn-eis":"eis", "btn-fruehstueck":"fruehstueck" };
+        for (const [id,key] of Object.entries(ids)) {
+            const button = document.getElementById(id);
+            if (!button) continue;
+            const amount = key === "kaffee" && birthdayCoffeeActive ? 0 : prices[key];
+            const spans = button.querySelectorAll("span");
+            if (spans.length) spans[spans.length - 1].textContent = amount.toFixed(2).replace(".", ",") + " €";
+        }
+    }
 
     function init() { 
         try {
@@ -186,7 +300,7 @@
             benutzerName = localStorage.getItem('kaffeekasse_user_name');
             
             // Zeigt den Namen im Infofeld an
-            document.getElementById('saldo-subtext').textContent = "Einsatzbereit - Kasse von " + benutzerName;
+            if (!birthdayCoffeeActive) document.getElementById('saldo-subtext').textContent = "Einsatzbereit - Kasse von " + benutzerName;
 
         } catch (e) {
             console.log("LocalStorage eingeschränkt.");
@@ -200,19 +314,17 @@
     function updateSaldoDisplay() {
         document.getElementById('my-saldo').textContent = meinSaldo.toFixed(2).replace('.', ',') + " €";
         
-        updateButtonState('btn-kaffee', 0.50);
-        updateButtonState('btn-cappuccino', 0.60);
-        updateButtonState('btn-wasser', 0.60);
-        updateButtonState('btn-soft33', 0.90);
-        updateButtonState('btn-soft5', 0.90);
-        updateButtonState('btn-schokokl', 0.30);
-        updateButtonState('btn-schokogr', 0.60);
-        updateButtonState('btn-eis', 0.50);
-        updateButtonState('btn-fruehstueck', 4.00);
+        updateButtonState('btn-kaffee', getPriceForItem('Automaten Kaffee', 0.50));
+        updateButtonState('btn-cappuccino', getPriceForItem('Cappuccino', 0.60));
+        updateButtonState('btn-wasser', getPriceForItem('Wasser 0,7L', 0.60));
+        updateButtonState('btn-soft33', getPriceForItem('Softdrink 0,33L', 0.90));
+        updateButtonState('btn-soft5', getPriceForItem('Softdrink 0,5L', 0.90));
+        updateButtonState('btn-schokokl', getPriceForItem('Schokoriegel klein', 0.30));
+        updateButtonState('btn-schokogr', getPriceForItem('Schokoriegel groß', 0.60));
+        updateButtonState('btn-eis', getPriceForItem('Eiscreme', 0.50));
+        updateButtonState('btn-fruehstueck', getPriceForItem('Freitagsfrühstück', 4.00));
 
-        const currentDay = new Date().getDate();
-        const secureBackupCode = Math.round((meinSaldo * CODE_MULTIPLIER) + (currentDay * DAY_MULTIPLIER) + CODE_OFFSET);
-        document.getElementById('backupCodeDisplay').textContent = secureBackupCode;
+        // Der alte, aus Guthaben und Datum ableitbare Sicherungscode wird nicht mehr angezeigt.
 
         try {
             localStorage.setItem('kaffeekasse_saldo_final', meinSaldo.toString());
@@ -272,6 +384,7 @@ function getCalendarWeek(date) {
     }
 
     function book(amount, itemName, triggerEmail = false) {
+        amount = getPriceForItem(itemName, amount);
         if (itemName === 'Freitagsfrühstück' && checkFruehstueckSperre()) {
             if (lastBreakfastWeek === getCurrentWeekKey()) {
                 showStatus("Du hast das Freitagsfrühstück für diese Woche bereits gebucht!", false);
@@ -327,6 +440,7 @@ function getCalendarWeek(date) {
             timestamp: new Date().toLocaleString('de-DE')
         };
 
+        if (!window.emailjs) { console.warn("EmailJS ist nicht geladen."); return; }
         emailjs.send("service_j85pq0k", "template_7an5vbo", templateParams)
             .then(function(response) {
                 console.log('E-Mail im Hintergrund gesendet!');
@@ -411,7 +525,7 @@ function executePaypalDeposit(betrag) {
         timestamp: new Date().toLocaleString('de-DE')
     };
 
-    emailjs.send(
+    if (window.emailjs) emailjs.send(
         "service_j85pq0k",
         "template_3eki0ij",
         templateParams
@@ -475,6 +589,12 @@ function executePaypalDeposit(betrag) {
     }
 
     
+
+    function logoutDevice() {
+        if (!confirm("Dieses Gerät wirklich abmelden? Guthaben und Buchungen bleiben auf diesem Gerät gespeichert.")) return;
+        localStorage.removeItem(ACCESS_STORAGE_KEY);
+        location.reload();
+    }
 
     checkFruehstueckDeadline();
 </script>
