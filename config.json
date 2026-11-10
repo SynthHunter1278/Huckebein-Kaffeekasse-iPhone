@@ -1,12 +1,12 @@
 {
   "geburtstag": {
-    "aktiv": false,
-    "spender": "",
+    "aktiv": true,
+    "spender": "peter",
     "datum": "2026-11-10"
   },
   "nachricht": {
-    "aktiv": false,
-    "text": "",
+    "aktiv": true,
+    "text": "Diese naCHRICHZ",
     "typ": "info"
   },
   "preise": {
@@ -18,6 +18,6 @@
     "btn-schokokl": 0.27,
     "btn-schokogr": 0.15,
     "btn-eis": 0.14,
-    "btn-fruehstueck": 4
+    "btn-fruehstueck": 7
   }
 }
