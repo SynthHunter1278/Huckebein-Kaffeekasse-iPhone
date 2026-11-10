@@ -1,12 +1,12 @@
 {
   "geburtstag": {
-    "aktiv": false,
-    "spender": "",
+    "aktiv": true,
+    "spender": "uwe",
     "datum": "2026-11-10"
   },
   "nachricht": {
-    "aktiv": false,
-    "text": "",
+    "aktiv": true,
+    "text": "hallo",
     "typ": "info"
   },
   "preise": {
