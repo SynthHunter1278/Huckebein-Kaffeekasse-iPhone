@@ -1,11 +1,11 @@
 {
   "geburtstag": {
-    "aktiv": true,
+    "aktiv": false,
     "spender": "uwe",
     "datum": "2026-11-10"
   },
   "nachricht": {
-    "aktiv": true,
+    "aktiv": false,
     "text": "hallo",
     "typ": "info"
   },
