@@ -1,6 +1,6 @@
 {
   "geburtstag": {
-    "aktiv": false,
+    "aktiv": true,
     "spender": "",
     "datum": "2026-11-10"
   },
