@@ -83,8 +83,11 @@
         </div>
 
         <button class="btn-save" onclick="saveAndPushConfig()" disabled>⏳ Live-Daten werden geladen...</button>
-        <span class="logout-link" onclick="clearCredentials()">GitHub-Token verwerfen / abmelden</span>
-        <p style="font-size:12px;color:#cbd5e1;line-height:1.45;text-align:center;">Der GitHub-Token wird nur während dieser geöffneten Admin-Sitzung im Arbeitsspeicher gehalten und nicht im Browser gespeichert. Für das Speichern wird ein Fine-grained Token mit Contents: Read and write benötigt.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px;">
+            <span class="logout-link" onclick="changeCredentials()">GitHub-Token ändern</span>
+            <span class="logout-link" onclick="clearCredentials()">Token löschen / abmelden</span>
+        </div>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.45;text-align:center;">Der GitHub-Token wird lokal in diesem Firefox-Profil gespeichert und beim nächsten Öffnen automatisch verwendet. Für das Speichern wird ein Fine-grained Token mit Contents: Read and write benötigt. Auf gemeinsam genutzten Geräten bitte nicht dauerhaft speichern.</p>
     </div>
 </div>
 <script>
@@ -95,15 +98,34 @@
     let currentSha = "";
     let configLoaded = false;
 
+    const TOKEN_STORAGE_KEY = "huckebein_admin_github_token";
+
     function checkCredentials() {
         if (githubToken) return true;
-        const token = prompt("Bitte deinen GitHub Fine-grained Personal Access Token eingeben. Er wird nicht gespeichert:");
+
+        // Zuerst den lokal gespeicherten Token aus genau diesem Browserprofil laden.
+        try {
+            const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+            if (savedToken && savedToken.trim()) {
+                githubToken = savedToken.trim();
+                return true;
+            }
+        } catch (e) {
+            showStatus("Der lokale Browserspeicher ist nicht verfügbar. Der Token kann nur bis zum Schließen dieser Sitzung verwendet werden.", false);
+        }
+
+        const token = prompt("Bitte deinen GitHub Fine-grained Personal Access Token eingeben. Er wird lokal in diesem Firefox-Profil gespeichert:");
         if (!token || !token.trim()) {
             showStatus("Ohne GitHub-Token ist keine Administration möglich.", false);
             document.getElementById("adminForm").style.display = "none";
             return false;
         }
         githubToken = token.trim();
+        try {
+            localStorage.setItem(TOKEN_STORAGE_KEY, githubToken);
+        } catch (e) {
+            showStatus("Token gilt nur für diese Sitzung: Firefox konnte ihn nicht lokal speichern.", false);
+        }
         return true;
     }
 
@@ -271,9 +293,26 @@
         }
     }
 
+    function changeCredentials() {
+        const token = prompt("Neuen GitHub Fine-grained Personal Access Token eingeben:");
+        if (!token || !token.trim()) return;
+        githubToken = token.trim();
+        try { localStorage.setItem(TOKEN_STORAGE_KEY, githubToken); }
+        catch (e) { showStatus("Firefox konnte den neuen Token nicht dauerhaft speichern.", false); }
+        currentSha = "";
+        configLoaded = false;
+        document.getElementById("adminForm").style.display = "block";
+        loadCurrentConfig();
+    }
+
     function clearCredentials() {
         githubToken = "";
-        location.reload();
+        try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch (e) {}
+        currentSha = "";
+        configLoaded = false;
+        const saveButton = document.querySelector(".btn-save");
+        if (saveButton) saveButton.disabled = true;
+        showStatus("Token wurde aus Firefox gelöscht. Zum erneuten Anmelden auf „GitHub-Token ändern“ klicken.", true);
     }
 
     function showStatus(msg, isSuccess) {
