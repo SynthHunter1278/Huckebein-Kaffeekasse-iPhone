@@ -1,23 +1,23 @@
 {
   "geburtstag": {
     "aktiv": false,
-    "spender": "Max",
+    "spender": "",
     "datum": "2026-11-11"
   },
   "nachricht": {
     "aktiv": false,
-    "text": "Hallo die ist ein Test",
-    "typ": "warnung"
+    "text": "",
+    "typ": "info"
   },
   "preise": {
-    "btn-kaffee": 0.5,
-    "btn-cappuccino": 0.6,
-    "btn-wasser": 0.6,
-    "btn-soft33": 0.9,
-    "btn-soft5": 0.9,
-    "btn-schokokl": 0.3,
-    "btn-schokogr": 0.6,
-    "btn-eis": 0.5,
-    "btn-fruehstueck": 4
+    "btn-kaffee": 0.6,
+    "btn-cappuccino": 0,
+    "btn-wasser": 0,
+    "btn-soft33": 0,
+    "btn-soft5": 0,
+    "btn-schokokl": 0,
+    "btn-schokogr": 0,
+    "btn-eis": 0,
+    "btn-fruehstueck": 0
   }
 }
