@@ -7,7 +7,7 @@
   "nachricht": {
     "aktiv": true,
     "text": "Hallo die ist ein Test",
-    "typ": "info"
+    "typ": "warnung"
   },
   "preise": {
     "btn-kaffee": 0.5,
