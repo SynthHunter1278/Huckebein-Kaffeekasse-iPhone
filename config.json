@@ -1,20 +1,20 @@
 {
   "geburtstag": {
-    "aktiv": true,
+    "aktiv": false,
     "spender": "",
-    "datum": "2026-11-10"
+    "datum": "2026-11-11"
   },
   "nachricht": {
-    "aktiv": true,
+    "aktiv": false,
     "text": "",
     "typ": "info"
   },
   "preise": {
-    "btn-kaffee": 0.15,
+    "btn-kaffee": 0,
     "btn-cappuccino": 0,
-    "btn-wasser": 0.14,
+    "btn-wasser": 0,
     "btn-soft33": 0,
-    "btn-soft5": 0.16,
+    "btn-soft5": 0,
     "btn-schokokl": 0,
     "btn-schokogr": 0,
     "btn-eis": 0,
