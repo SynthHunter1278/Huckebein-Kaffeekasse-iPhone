@@ -1,4 +1,4 @@
-screme {
+
   "geburtstag": {
     "aktiv": false,
     "spender": "MAX",
@@ -6,7 +6,7 @@ screme {
   },
   "nachricht": {
     "aktiv": true,
-    "text": "Getränk 0,5L zur Zeit nicht im Angebot",
+    "text": "Getränk 0,5L und Eiscreme zur Zeit nicht im Angebot",
     "typ": "info"
   },
   "preise": {
