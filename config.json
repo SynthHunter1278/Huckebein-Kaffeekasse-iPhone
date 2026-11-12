@@ -1,12 +1,12 @@
   { 
   "geburtstag": {
-    "aktiv": false,
-    "spender": "MAX",
+    "aktiv": true,
+    "spender": "Dirk Wegmeyer spendiert heute Kaffee",
     "datum": "2026-11-11"
   },
   "nachricht": {
     "aktiv": true,
-    "text": "Getränk 0,5L und Eiscreme zur Zeit nicht im Angebot",
+    "text": "Achtung! Dirk Wegmeyer spendiert heute Kaffee",
     "typ": "info"
   },
   "preise": {
