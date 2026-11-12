@@ -5,7 +5,7 @@
     "datum": "2026-11-12"
   },
   "nachricht": {
-    "aktiv": true,
+    "aktiv": false,
     "text": "alte meldung",
     "typ": "info"
   },
