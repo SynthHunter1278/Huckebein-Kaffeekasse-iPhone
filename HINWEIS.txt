@@ -1,0 +1,17 @@
+HUCKEBEIN-KAFFEEKASSE – ADMIN-OPTIONEN
+
+Diese Aktualisierung enthält zwei Änderungen:
+1. In der Admin-App können einzelne Produkte ein- und ausgeblendet werden.
+2. In der Admin-App lässt sich die PayPal-Aufladung global ein- und ausschalten.
+
+Einbau:
+- admin.html im Hauptverzeichnis des GitHub-Repositories ersetzen.
+- index.html im Hauptverzeichnis des GitHub-Repositories ersetzen.
+- config.json NICHT manuell ersetzen. Die Admin-App erweitert die Konfiguration beim nächsten Speichern automatisch.
+- sw.js und alle anderen Dateien bleiben unverändert.
+
+Nach dem Hochladen beide Apps neu öffnen. In der Admin-App die gewünschten Produkt-Schalter und den PayPal-Schalter setzen und einmal auf „Speichern & Live schalten“ drücken.
+
+Standards für alte config.json:
+- Produkte ohne gespeicherten Verfügbarkeitswert bleiben sichtbar.
+- PayPal bleibt aktiviert, solange es nicht ausdrücklich deaktiviert wurde.

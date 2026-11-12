@@ -1,4 +1,4 @@
-Version<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -99,7 +99,7 @@ Version<!DOCTYPE html>
 <body onload="startApp()">
 <div id="accessGate" class="access-gate">
   <div class="access-card">
-    <h2>☕ Kaffeekasse Beta Test</h2>
+    <h2>☕ Kaffeekasse</h2>
     <p>Bitte gib den Zugangscode ein, den du von der Kaffeekassen-Administration erhalten hast.</p>
     <form onsubmit="event.preventDefault(); unlockApp();">
       <input id="accessCodeInput" type="password" autocomplete="one-time-code" placeholder="4-stelliger Zugangscode" maxlength="4" inputmode="numeric" pattern="[0-9]{4}" required>
@@ -121,7 +121,7 @@ Version<!DOCTYPE html>
 </div>
 
 <div class="container">
-    <h1>☕ Hans Huckebein Kaffeekasse Beta Test</h1>
+    <h1>☕ Hans Huckebein Kaffeekasse</h1>
     <div id="noticeBanner" role="status"></div>
 
     <div class="saldo-box">
@@ -151,7 +151,7 @@ Version<!DOCTYPE html>
     <div style="font-weight: bold; margin-top: 25px; margin-bottom: 5px; color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Guthaben aufladen:</div>
     <div class="action-grid">
         <button class="btn btn-cash" onclick="addCashWithCode()">💵 Bar-Aufladung</button>
-        <button class="btn btn-paypal" onclick="togglePaypalMenu()">📱 per PayPal</button>
+        <button id="paypalButton" class="btn btn-paypal" onclick="togglePaypalMenu()">📱 per PayPal</button>
         
         <div id="cashMenu" class="cash-dropdown">
             <div style="font-size: 12px; font-weight: bold; color: #7f8c8d; text-transform: uppercase; margin-bottom: 8px;">Code eingeben:</div>
@@ -189,6 +189,20 @@ Version<!DOCTYPE html>
     const DEFAULT_PRICES = { kaffee:0.50, cappuccino:0.60, wasser:0.60, soft33:0.90, soft5:0.90, schokokl:0.30, schokogr:0.60, eis:0.50, fruehstueck:4.00 };
     let prices = { ...DEFAULT_PRICES };
     let birthdayCoffeeActive = false;
+    const PRODUCT_IDS = {
+        kaffee: "btn-kaffee", cappuccino: "btn-cappuccino", wasser: "btn-wasser",
+        soft33: "btn-soft33", soft5: "btn-soft5", schokokl: "btn-schokokl",
+        schokogr: "btn-schokogr", eis: "btn-eis", fruehstueck: "btn-fruehstueck"
+    };
+    const PRODUCT_ID_BY_NAME = {
+        "Automaten Kaffee": "btn-kaffee", "Cappuccino": "btn-cappuccino",
+        "Wasser 0,7L": "btn-wasser", "Softdrink 0,33L": "btn-soft33",
+        "Softdrink 0,5L": "btn-soft5", "Schokoriegel klein": "btn-schokokl",
+        "Schokoriegel groß": "btn-schokogr", "Eiscreme": "btn-eis",
+        "Freitagsfrühstück": "btn-fruehstueck"
+    };
+    let productVisibility = Object.fromEntries(Object.values(PRODUCT_IDS).map(id => [id, true]));
+    let paypalEnabled = true;
 
     let meinSaldo = 0.00;
     let usedCodes = [];
@@ -252,6 +266,11 @@ Version<!DOCTYPE html>
                 const numeric = Number(value);
                 if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 100) prices[key] = numeric;
             }
+            const sourceVisibility = config.produkte?.anzeigen || config.productAvailability || {};
+            productVisibility = Object.fromEntries(
+                Object.values(PRODUCT_IDS).map(id => [id, sourceVisibility[id] !== false])
+            );
+            paypalEnabled = Boolean(config.paypal?.aktiv ?? config.paypalEnabled ?? true);
             birthdayCoffeeActive = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
             const giver = config.geburtstag?.spender || config.freeCoffee?.giver || "";
             const message = config.nachricht || config.message;
@@ -293,10 +312,15 @@ Version<!DOCTYPE html>
         for (const [id,key] of Object.entries(ids)) {
             const button = document.getElementById(id);
             if (!button) continue;
+            button.style.display = productVisibility[id] === false ? "none" : "";
             const amount = key === "kaffee" && birthdayCoffeeActive ? 0 : prices[key];
             const spans = button.querySelectorAll("span");
             if (spans.length) spans[spans.length - 1].textContent = amount.toFixed(2).replace(".", ",") + " €";
         }
+        const paypalButton = document.getElementById("paypalButton");
+        const paypalMenu = document.getElementById("paypalMenu");
+        if (paypalButton) paypalButton.style.display = paypalEnabled ? "" : "none";
+        if (!paypalEnabled && paypalMenu) paypalMenu.style.display = "none";
     }
 
     let statusTimer = null;
@@ -485,6 +509,11 @@ function getCalendarWeek(date) {
     }
 
     function book(amount, itemName, triggerEmail = false) {
+        const productId = PRODUCT_ID_BY_NAME[itemName];
+        if (productId && productVisibility[productId] === false) {
+            showStatus(itemName + " ist derzeit nicht verfügbar.", false);
+            return false;
+        }
         amount = getPriceForItem(itemName, amount);
         if (itemName === 'Freitagsfrühstück' && checkFruehstueckSperre()) {
             if (lastBreakfastWeek === getCurrentWeekKey()) {
@@ -601,12 +630,20 @@ function getCalendarWeek(date) {
     }
 
     function togglePaypalMenu() {
+        if (!paypalEnabled) {
+            showStatus("PayPal-Aufladung ist derzeit deaktiviert.", false);
+            return;
+        }
         document.getElementById('cashMenu').style.display = "none";
         const menu = document.getElementById('paypalMenu');
         menu.style.display = (menu.style.display === "block") ? "none" : "block";
     }
 
 function executePaypalDeposit(betrag) {
+    if (!paypalEnabled) {
+        showStatus("PayPal-Aufladung ist derzeit deaktiviert.", false);
+        return;
+    }
     const currentDay = new Date().getDate();
 
     const passenderCode =

@@ -26,6 +26,8 @@
         .status-success { background: #16a34a; color: white; }
         .status-error { background: #dc2626; color: white; }
         .price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .availability-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
+        .availability-item { display: flex; align-items: center; gap: 8px; min-height: 30px; color: #cbd5e1; font-size: 13px; font-weight: bold; }
         .logout-link { display: block; text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
@@ -82,49 +84,63 @@
             <div class="form-group"><label>Frühstück:</label><input type="number" step="0.01" id="p_fruehstueck"></div>
         </div>
 
-        <button class="btn-save" onclick="saveAndPushConfig()" disabled>⏳ Live-Daten werden geladen...</button>
-        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px;">
-            <span class="logout-link" onclick="changeCredentials()">GitHub-Token ändern</span>
-            <span class="logout-link" onclick="clearCredentials()">Token löschen / abmelden</span>
+        <h2>📦 Produktverfügbarkeit</h2>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.4;margin-top:-5px;">Nicht verfügbare Produkte abwählen. Sie werden anschließend in der Kassen-App ausgeblendet.</p>
+        <div class="availability-grid">
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_kaffee" checked><span class="slider"></span></label><span>Kaffee anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_cappuccino" checked><span class="slider"></span></label><span>Cappuccino anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_wasser" checked><span class="slider"></span></label><span>Wasser anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_soft33" checked><span class="slider"></span></label><span>Softdrink 0,33L anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_soft5" checked><span class="slider"></span></label><span>Softdrink 0,5L anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_schokokl" checked><span class="slider"></span></label><span>Schokoriegel klein anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_schokogr" checked><span class="slider"></span></label><span>Schokoriegel groß anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_eis" checked><span class="slider"></span></label><span>Eiscreme anzeigen</span></div>
+            <div class="availability-item"><label class="switch"><input type="checkbox" id="v_fruehstueck" checked><span class="slider"></span></label><span>Frühstück anzeigen</span></div>
         </div>
-        <p style="font-size:12px;color:#cbd5e1;line-height:1.45;text-align:center;">Der GitHub-Token wird lokal in diesem Firefox-Profil gespeichert und beim nächsten Öffnen automatisch verwendet. Für das Speichern wird ein Fine-grained Token mit Contents: Read and write benötigt. Auf gemeinsam genutzten Geräten bitte nicht dauerhaft speichern.</p>
+
+        <h2>💳 PayPal-Aufladung</h2>
+        <div class="form-group flex-group">
+            <label class="switch">
+                <input type="checkbox" id="paypalActive" checked>
+                <span class="slider"></span>
+            </label>
+            <span>PayPal-Aufladung in der Kassen-App erlauben</span>
+        </div>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.4;margin-top:-8px;">Bei ausgeschalteter Option wird der PayPal-Button in der Kassen-App ausgeblendet und eine neue PayPal-Aufladung verhindert. Die Bar-Aufladung bleibt verfügbar.</p>
+
+        <button class="btn-save" onclick="saveAndPushConfig()" disabled>⏳ Live-Daten werden geladen...</button>
+        <span class="logout-link" onclick="changeCredentials()">GitHub-Token ändern</span>
+        <span class="logout-link" onclick="clearCredentials()">Gespeicherten Token löschen / abmelden</span>
+        <p style="font-size:12px;color:#cbd5e1;line-height:1.45;text-align:center;">Der GitHub-Token wird auf diesem Gerät in diesem Browser gespeichert. Auf PC, Android und iPhone muss er jeweils einmal eingegeben werden. Für das Speichern wird ein Fine-grained Token mit Contents: Read and write benötigt.</p>
     </div>
 </div>
 <script>
+    // Der Token wird getrennt je Gerät und Browserprofil gespeichert.
+    const TOKEN_STORAGE_KEY = "huckebein_admin_github_token";
     let githubToken = "";
+    try { githubToken = localStorage.getItem(TOKEN_STORAGE_KEY) || ""; }
+    catch (_) { githubToken = ""; }
+
     const githubUser = "SynthHunter1278";
     const githubRepo = "Huckebein-Kaffeekasse-iPhone-Android";
     const configPath = "config.json";
     let currentSha = "";
     let configLoaded = false;
 
-    const TOKEN_STORAGE_KEY = "huckebein_admin_github_token";
-
     function checkCredentials() {
         if (githubToken) return true;
-
-        // Zuerst den lokal gespeicherten Token aus genau diesem Browserprofil laden.
-        try {
-            const savedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-            if (savedToken && savedToken.trim()) {
-                githubToken = savedToken.trim();
-                return true;
-            }
-        } catch (e) {
-            showStatus("Der lokale Browserspeicher ist nicht verfügbar. Der Token kann nur bis zum Schließen dieser Sitzung verwendet werden.", false);
-        }
-
-        const token = prompt("Bitte deinen GitHub Fine-grained Personal Access Token eingeben. Er wird lokal in diesem Firefox-Profil gespeichert:");
+        const token = prompt("Bitte deinen GitHub Fine-grained Personal Access Token eingeben. Er wird anschließend auf diesem Gerät in diesem Browser gespeichert:");
         if (!token || !token.trim()) {
-            showStatus("Ohne GitHub-Token ist keine Administration möglich.", false);
-            document.getElementById("adminForm").style.display = "none";
+            showStatus("Kein Token eingegeben. Du kannst den Token über 'GitHub-Token ändern' erneut eingeben.", false);
             return false;
         }
         githubToken = token.trim();
         try {
             localStorage.setItem(TOKEN_STORAGE_KEY, githubToken);
-        } catch (e) {
-            showStatus("Token gilt nur für diese Sitzung: Firefox konnte ihn nicht lokal speichern.", false);
+        } catch (_) {
+            showStatus("Der Browser konnte den Token nicht dauerhaft speichern. Bitte Browser-Speicher erlauben.", false);
+            githubToken = "";
+            return false;
         }
         return true;
     }
@@ -209,6 +225,14 @@
                 const value = p[id] ?? p[key];
                 if (value !== undefined) document.getElementById("p_" + key).value = Number(value).toFixed(2);
             }
+
+            const visibility = config.produkte?.anzeigen || config.productAvailability || {};
+            for (const key of Object.keys(mapping)) {
+                const productId = mapping[key];
+                document.getElementById("v_" + key).checked = visibility[productId] !== false;
+            }
+            document.getElementById("paypalActive").checked = Boolean(config.paypal?.aktiv ?? config.paypalEnabled ?? true);
+
             configLoaded = true;
             const saveButton = document.querySelector(".btn-save");
             saveButton.disabled = false;
@@ -257,7 +281,21 @@
                     "btn-schokogr": parsePrice("p_schokogr"),
                     "btn-eis": parsePrice("p_eis"),
                     "btn-fruehstueck": parsePrice("p_fruehstueck")
-                }
+                },
+                produkte: {
+                    anzeigen: {
+                        "btn-kaffee": document.getElementById("v_kaffee").checked,
+                        "btn-cappuccino": document.getElementById("v_cappuccino").checked,
+                        "btn-wasser": document.getElementById("v_wasser").checked,
+                        "btn-soft33": document.getElementById("v_soft33").checked,
+                        "btn-soft5": document.getElementById("v_soft5").checked,
+                        "btn-schokokl": document.getElementById("v_schokokl").checked,
+                        "btn-schokogr": document.getElementById("v_schokogr").checked,
+                        "btn-eis": document.getElementById("v_eis").checked,
+                        "btn-fruehstueck": document.getElementById("v_fruehstueck").checked
+                    }
+                },
+                paypal: { aktiv: document.getElementById("paypalActive").checked }
             };
         } catch (e) { showStatus(e.message, false); return; }
 
@@ -297,22 +335,19 @@
         const token = prompt("Neuen GitHub Fine-grained Personal Access Token eingeben:");
         if (!token || !token.trim()) return;
         githubToken = token.trim();
-        try { localStorage.setItem(TOKEN_STORAGE_KEY, githubToken); }
-        catch (e) { showStatus("Firefox konnte den neuen Token nicht dauerhaft speichern.", false); }
-        currentSha = "";
-        configLoaded = false;
-        document.getElementById("adminForm").style.display = "block";
-        loadCurrentConfig();
+        try {
+            localStorage.setItem(TOKEN_STORAGE_KEY, githubToken);
+            location.reload();
+        } catch (_) {
+            githubToken = "";
+            showStatus("Der neue Token konnte nicht gespeichert werden. Bitte Browser-Speicher prüfen.", false);
+        }
     }
 
     function clearCredentials() {
         githubToken = "";
-        try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch (e) {}
-        currentSha = "";
-        configLoaded = false;
-        const saveButton = document.querySelector(".btn-save");
-        if (saveButton) saveButton.disabled = true;
-        showStatus("Token wurde aus Firefox gelöscht. Zum erneuten Anmelden auf „GitHub-Token ändern“ klicken.", true);
+        try { localStorage.removeItem(TOKEN_STORAGE_KEY); } catch (_) {}
+        location.reload();
     }
 
     function showStatus(msg, isSuccess) {
