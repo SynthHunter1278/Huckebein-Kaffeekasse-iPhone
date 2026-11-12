@@ -1,12 +1,12 @@
   { 
   "geburtstag": {
-    "aktiv": true,
+    "aktiv": false,
     "spender": "Dirk Wegmeyer spendiert heute Kaffee",
     "datum": "2026-11-11"
   },
   "nachricht": {
     "aktiv": true,
-    "text": "Achtung! Dirk Wegmeyer spendiert heute Kaffee",
+    "text": "Vielen Dank für die Teilnahme am Beta Programm",
     "typ": "info"
   },
   "preise": {
