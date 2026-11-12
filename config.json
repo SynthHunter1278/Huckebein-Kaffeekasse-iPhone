@@ -6,7 +6,7 @@
   },
   "nachricht": {
     "aktiv": true,
-    "text": "neue meldung",
+    "text": "aktuelle meldung",
     "typ": "info"
   },
   "preise": {
@@ -35,5 +35,9 @@
   },
   "paypal": {
     "aktiv": false
+  },
+  "letzteNachricht": {
+    "text": "neue meldung",
+    "typ": "info"
   }
 }
