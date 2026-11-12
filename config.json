@@ -34,7 +34,7 @@
     }
   },
   "paypal": {
-    "aktiv": false
+    "aktiv": true
   },
   "letzteNachricht": {
     "text": "Liebe Tester, ich habe Änderungen an der Strucktur der App vorgenommen.",
