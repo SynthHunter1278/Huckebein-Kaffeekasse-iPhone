@@ -1,11 +1,11 @@
 {
   "geburtstag": {
-    "aktiv": true,
+    "aktiv": false,
     "spender": "Dirk Wegmeyer",
     "datum": "2026-11-12"
   },
   "nachricht": {
-    "aktiv": true,
+    "aktiv": false,
     "text": "PaPal Aufladung für die Testphase deaktiviert",
     "typ": "info"
   },
