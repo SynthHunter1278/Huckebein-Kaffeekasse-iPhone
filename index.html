@@ -346,31 +346,72 @@
             birthdayCoffeeActive = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
             const giver = config.geburtstag?.spender || config.freeCoffee?.giver || "";
             const message = config.nachricht || config.message;
-            const previousMessage = config.letzteNachricht || config.lastMessage;
+            const remotePreviousMessage = config.letzteNachricht || config.lastMessage;
             const banner = document.getElementById("noticeBanner");
             const messageText = document.getElementById("noticeText");
             const previousBanner = document.getElementById("previousNoticeBanner");
             const previousText = document.getElementById("previousNoticeText");
+            const CURRENT_NOTICE_CACHE_KEY = "kaffeekasse_current_notice_cache_v1";
+            const PREVIOUS_NOTICE_CACHE_KEY = "kaffeekasse_previous_notice_cache_v1";
 
-            // Die zwei zuletzt veröffentlichten Nachrichten bleiben gemeinsam sichtbar.
-            // Die Anzeige wird weiterhin über "Nachricht einblenden" gesteuert.
+            // Die Kassen-App merkt sich die zuletzt angezeigte aktive Nachricht lokal.
+            // Ändert sich der Text aus config.json, wird die bisherige Nachricht zur letzten.
             banner.style.display = "none";
             messageText.textContent = "";
             previousBanner.style.display = "none";
             previousText.textContent = "";
+
             const currentMessageActive = Boolean(message?.aktiv ?? message?.active);
-            if (currentMessageActive && String(message?.text || "").trim()) {
-                messageText.textContent = String(message.text).trim();
+            const currentMessageText = String(message?.text || "").trim();
+            if (currentMessageActive && currentMessageText) {
+                const currentNotice = {
+                    text: currentMessageText,
+                    typ: message.typ || (message.color === "red" ? "warnung" : "info")
+                };
+                let cachedCurrent = null;
+                let cachedPrevious = null;
+                try {
+                    cachedCurrent = JSON.parse(localStorage.getItem(CURRENT_NOTICE_CACHE_KEY) || "null");
+                    cachedPrevious = JSON.parse(localStorage.getItem(PREVIOUS_NOTICE_CACHE_KEY) || "null");
+                } catch (storageError) {
+                    console.warn("Nachrichten-Zwischenspeicher konnte nicht gelesen werden:", storageError);
+                }
+
+                const validNotice = value => value && typeof value.text === "string" && value.text.trim();
+                let previousNotice = validNotice(cachedPrevious) ? cachedPrevious : null;
+
+                if (validNotice(cachedCurrent) && cachedCurrent.text.trim() !== currentNotice.text) {
+                    // Bei einer neuen Meldung wird die bisherige aktuelle Meldung zur letzten.
+                    previousNotice = {
+                        text: cachedCurrent.text.trim(),
+                        typ: cachedCurrent.typ || "info"
+                    };
+                } else if (!validNotice(cachedCurrent) && validNotice(remotePreviousMessage)) {
+                    // Einmaliger Rückgriff auf eventuell bereits in config.json vorhandene Altdaten.
+                    previousNotice = {
+                        text: remotePreviousMessage.text.trim(),
+                        typ: remotePreviousMessage.typ || (remotePreviousMessage.color === "red" ? "warnung" : "info")
+                    };
+                }
+
+                try {
+                    if (previousNotice) localStorage.setItem(PREVIOUS_NOTICE_CACHE_KEY, JSON.stringify(previousNotice));
+                    localStorage.setItem(CURRENT_NOTICE_CACHE_KEY, JSON.stringify(currentNotice));
+                } catch (storageError) {
+                    console.warn("Nachrichten-Zwischenspeicher konnte nicht gespeichert werden:", storageError);
+                }
+
+                messageText.textContent = currentNotice.text;
                 banner.style.display = "block";
-                const isWarning = message.typ === "warnung" || message.color === "red";
+                const isWarning = currentNotice.typ === "warnung";
                 banner.style.background = isWarning ? "#fee2e2" : "#dbeafe";
                 banner.style.color = isWarning ? "#991b1b" : "#1e40af";
                 banner.style.borderColor = isWarning ? "#ef4444" : "#60a5fa";
 
-                if (previousMessage && String(previousMessage.text || "").trim()) {
-                    previousText.textContent = String(previousMessage.text).trim();
+                if (validNotice(previousNotice)) {
+                    previousText.textContent = previousNotice.text.trim();
                     previousBanner.style.display = "block";
-                    const previousIsWarning = previousMessage.typ === "warnung" || previousMessage.color === "red";
+                    const previousIsWarning = previousNotice.typ === "warnung" || previousNotice.color === "red";
                     previousBanner.style.background = previousIsWarning ? "#fee2e2" : "#dbeafe";
                     previousBanner.style.color = previousIsWarning ? "#991b1b" : "#1e40af";
                     previousBanner.style.borderColor = previousIsWarning ? "#ef4444" : "#60a5fa";

@@ -1,9 +1,14 @@
-Huckebein-Kaffeekasse – Anzeige der letzten beiden Nachrichten
+Huckebein Kaffeekasse – Nachrichten-Zwischenspeicher
 
-Enthalten sind:
-- admin.html: merkt beim Veröffentlichen einer neuen Nachricht die bisherige aktive Nachricht als letzte Nachricht vor.
-- index.html: zeigt die letzte und die aktuelle Nachricht in getrennten Feldern an.
+Enthaltene Datei:
+- index.html
 
-Einbau: Beide Dateien im Hauptverzeichnis des GitHub-Repositories ersetzen und committen.
-config.json wird beim nächsten Speichern durch die Admin-App um das Feld letzteNachricht ergänzt. Alte Konfigurationen bleiben kompatibel.
-Die 10-Sekunden-Blinkdauer für den Geburtstagskaffee bleibt erhalten.
+Einbau:
+1. index.html im Hauptverzeichnis des GitHub-Repositories ersetzen.
+2. Commit changes ausführen.
+3. Kassen-App mit Internetverbindung neu öffnen bzw. aktualisieren.
+4. Wichtig: Nach dem Einspielen die Kassen-App einmal öffnen, damit sie die aktuell angezeigte Nachricht lokal speichert.
+5. Bei der nächsten neuen aktiven Nachricht zeigt die App die bisherige Nachricht zusätzlich als „Letzte Nachricht“ an.
+
+admin.html, config.json und sw.js müssen nicht geändert werden.
+Die Geburtstags-Blinkdauer von 10 Sekunden bleibt erhalten.
