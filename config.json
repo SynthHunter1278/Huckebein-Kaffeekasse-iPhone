@@ -5,7 +5,7 @@
     "datum": "2026-11-12"
   },
   "nachricht": {
-    "aktiv": false,
+    "aktiv": true,
     "text": "Nachrichten und Geburtstagkaffee Meldung sind jetzt übersichtlicher",
     "typ": "info"
   },
