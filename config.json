@@ -5,8 +5,8 @@
     "datum": "2026-11-12"
   },
   "nachricht": {
-    "aktiv": false,
-    "text": "alte meldung",
+    "aktiv": true,
+    "text": "neue meldung",
     "typ": "info"
   },
   "preise": {
