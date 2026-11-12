@@ -6,7 +6,7 @@
   },
   "nachricht": {
     "aktiv": true,
-    "text": "Liebe Tester, ich habe Änderungen an der Strucktur der App vorgenommen.",
+    "text": "Nachrichten und Geburtstagkaffee Meldung sind jetzt übersichtlicher",
     "typ": "info"
   },
   "preise": {
@@ -37,7 +37,7 @@
     "aktiv": false
   },
   "letzteNachricht": {
-    "text": "Liebe Tester, ich Änderungen an der Strucktur der App vorgenommen.",
+    "text": "Liebe Tester, ich habe Änderungen an der Strucktur der App vorgenommen.",
     "typ": "info"
   }
 }
