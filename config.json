@@ -6,7 +6,7 @@
   },
   "nachricht": {
     "aktiv": true,
-    "text": "aktuelle meldung",
+    "text": "Liebe Tester, ich Änderungen an der Strucktur der App vorgenommen.",
     "typ": "info"
   },
   "preise": {
@@ -37,7 +37,7 @@
     "aktiv": false
   },
   "letzteNachricht": {
-    "text": "neue meldung",
+    "text": "aktuelle meldung",
     "typ": "info"
   }
 }
