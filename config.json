@@ -5,8 +5,8 @@
     "datum": "2026-11-11"
   },
   "nachricht": {
-    "aktiv": false,
-    "text": "Der",
+    "aktiv": true,
+    "text": "Getränk 0,5L zur Zeit nicht im Angebot",
     "typ": "info"
   },
   "preise": {
