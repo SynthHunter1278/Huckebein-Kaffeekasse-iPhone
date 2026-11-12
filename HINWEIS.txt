@@ -1,18 +1,9 @@
-Huckebein-Kaffeekasse – Anzeige der letzten Nachricht und Geburtstagskaffee
+Huckebein-Kaffeekasse – Anzeige der letzten beiden Nachrichten
 
-Bitte im GitHub-Hauptverzeichnis diese beiden Dateien ersetzen:
-- index.html
-- sw.js
+Enthalten sind:
+- admin.html: merkt beim Veröffentlichen einer neuen Nachricht die bisherige aktive Nachricht als letzte Nachricht vor.
+- index.html: zeigt die letzte und die aktuelle Nachricht in getrennten Feldern an.
 
-Die Datei sw.js muss exakt sw.js heißen (nicht sw.js.txt).
-Danach beide Änderungen mit Commit changes speichern.
-
-Die Admin-App (admin.html), config.json sowie Guthaben und lokale Buchungen
-werden nicht ersetzt oder gelöscht.
-
-Änderungen:
-- Die aktuelle Admin-Nachricht wird als gut lesbares Feld mit Überschrift angezeigt.
-- Die Geburtstagskaffee-Information erscheint als großer grüner Hinweis.
-- Dieser Hinweis blinkt beim Öffnen der Kassen-App und nach dem Zurückkehren
-  aus dem Hintergrund ungefähr sechs Sekunden lang.
-- Der Service Worker verwendet v6, damit er die neue index.html laden kann.
+Einbau: Beide Dateien im Hauptverzeichnis des GitHub-Repositories ersetzen und committen.
+config.json wird beim nächsten Speichern durch die Admin-App um das Feld letzteNachricht ergänzt. Alte Konfigurationen bleiben kompatibel.
+Die 10-Sekunden-Blinkdauer für den Geburtstagskaffee bleibt erhalten.

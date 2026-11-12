@@ -94,7 +94,7 @@
         .access-error { color: #b91c1c; min-height: 20px; font-size: 13px; margin-top: 10px; }
         .access-note { font-size: 12px; color: #64748b; line-height: 1.45; margin-top: 14px; }
         /* Deutlich sichtbares Feld für die zuletzt von der Administration geschaltete Nachricht */
-        #noticeBanner {
+        #noticeBanner, #previousNoticeBanner {
             display:none;
             padding:15px 16px;
             border:2px solid #93c5fd;
@@ -185,8 +185,12 @@
         <div id="birthdayText" class="birthday-detail">Der Automatenkaffee ist für alle kostenlos.</div>
     </div>
 
+    <div id="previousNoticeBanner" role="status" aria-live="polite">
+        <span class="notice-heading">🕘 Letzte Nachricht</span>
+        <div id="previousNoticeText"></div>
+    </div>
     <div id="noticeBanner" role="status" aria-live="polite">
-        <span class="notice-heading">📢 Nachricht an alle</span>
+        <span class="notice-heading">📢 Aktuelle Nachricht</span>
         <div id="noticeText"></div>
     </div>
 
@@ -342,19 +346,35 @@
             birthdayCoffeeActive = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
             const giver = config.geburtstag?.spender || config.freeCoffee?.giver || "";
             const message = config.nachricht || config.message;
+            const previousMessage = config.letzteNachricht || config.lastMessage;
             const banner = document.getElementById("noticeBanner");
             const messageText = document.getElementById("noticeText");
-            // Die zuletzt geschaltete Nachricht bleibt als gut lesbares Infofeld sichtbar,
-            // solange sie in der Admin-App aktiviert ist.
+            const previousBanner = document.getElementById("previousNoticeBanner");
+            const previousText = document.getElementById("previousNoticeText");
+
+            // Die zwei zuletzt veröffentlichten Nachrichten bleiben gemeinsam sichtbar.
+            // Die Anzeige wird weiterhin über "Nachricht einblenden" gesteuert.
             banner.style.display = "none";
             messageText.textContent = "";
-            if ((message?.aktiv || message?.active) && String(message.text || "").trim()) {
+            previousBanner.style.display = "none";
+            previousText.textContent = "";
+            const currentMessageActive = Boolean(message?.aktiv ?? message?.active);
+            if (currentMessageActive && String(message?.text || "").trim()) {
                 messageText.textContent = String(message.text).trim();
                 banner.style.display = "block";
                 const isWarning = message.typ === "warnung" || message.color === "red";
                 banner.style.background = isWarning ? "#fee2e2" : "#dbeafe";
                 banner.style.color = isWarning ? "#991b1b" : "#1e40af";
                 banner.style.borderColor = isWarning ? "#ef4444" : "#60a5fa";
+
+                if (previousMessage && String(previousMessage.text || "").trim()) {
+                    previousText.textContent = String(previousMessage.text).trim();
+                    previousBanner.style.display = "block";
+                    const previousIsWarning = previousMessage.typ === "warnung" || previousMessage.color === "red";
+                    previousBanner.style.background = previousIsWarning ? "#fee2e2" : "#dbeafe";
+                    previousBanner.style.color = previousIsWarning ? "#991b1b" : "#1e40af";
+                    previousBanner.style.borderColor = previousIsWarning ? "#ef4444" : "#60a5fa";
+                }
             }
 
             const birthdayBanner = document.getElementById("birthdayBanner");

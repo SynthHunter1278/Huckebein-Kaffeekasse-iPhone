@@ -126,6 +126,7 @@
     const configPath = "config.json";
     let currentSha = "";
     let configLoaded = false;
+    let loadedConfig = {};
 
     function checkCredentials() {
         if (githubToken) return true;
@@ -212,6 +213,7 @@
             if (!data.sha || !data.content) throw new Error("GitHub-Antwort enthält keine Dateidaten. Bitte prüfen, ob config.json im Hauptverzeichnis liegt.");
             currentSha = data.sha;
             const config = JSON.parse(decodeBase64Utf8(data.content));
+            loadedConfig = config;
 
             document.getElementById("freeCoffeeActive").checked = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
             document.getElementById("freeCoffeeGiver").value = config.geburtstag?.spender || config.freeCoffee?.giver || "";
@@ -311,10 +313,39 @@
                 cache: "no-store"
             }, 3);
             const current = await readApiJson(getResponse);
-            if (!current.sha) throw new Error("GitHub hat keine Datei-SHA geliefert; config.json kann nicht sicher aktualisiert werden.");
+            if (!current.sha || !current.content) throw new Error("GitHub hat keine vollständigen Dateidaten geliefert; config.json kann nicht sicher aktualisiert werden.");
             currentSha = current.sha;
 
-            const contentBase64 = btoa(Array.from(new TextEncoder().encode(JSON.stringify(updatedConfig, null, 2)), b => String.fromCharCode(b)).join(""));
+            // Immer die zuletzt veröffentlichte Konfiguration als Basis nehmen, damit
+            // vorhandene Einstellungen und unbekannte Zusatzfelder erhalten bleiben.
+            const latestConfig = JSON.parse(decodeBase64Utf8(current.content));
+            const oldMessage = latestConfig.nachricht || latestConfig.message || {};
+            const oldPrevious = latestConfig.letzteNachricht || latestConfig.lastMessage || null;
+            const oldText = String(oldMessage.text || "").trim();
+            const oldActive = Boolean(oldMessage.aktiv ?? oldMessage.active);
+            const newText = String(updatedConfig.nachricht.text || "").trim();
+            const newActive = Boolean(updatedConfig.nachricht.aktiv);
+            const oldType = oldMessage.typ || (oldMessage.color === "red" ? "warnung" : "info");
+
+            // Wenn eine neue aktive Nachricht veröffentlicht wird, wandert die
+            // bisherige aktive Nachricht in "letzteNachricht". Die vorherige Historie
+            // wird ersetzt, sodass immer genau die letzten beiden sichtbar sind.
+            let previousMessage = oldPrevious;
+            if (newActive && newText && oldActive && oldText && oldText !== newText) {
+                previousMessage = { text: oldText, typ: oldType };
+            }
+            if (!previousMessage || !String(previousMessage.text || "").trim()) {
+                previousMessage = null;
+            } else {
+                previousMessage = {
+                    text: String(previousMessage.text).trim(),
+                    typ: previousMessage.typ || (previousMessage.color === "red" ? "warnung" : "info")
+                };
+            }
+            updatedConfig.letzteNachricht = previousMessage;
+            const finalConfig = { ...latestConfig, ...updatedConfig };
+
+            const contentBase64 = btoa(Array.from(new TextEncoder().encode(JSON.stringify(finalConfig, null, 2)), b => String.fromCharCode(b)).join(""));
             const response = await fetch(apiUrl(), {
                 method: "PUT",
                 headers: { ...githubHeaders(), "Content-Type": "application/json" },
@@ -322,7 +353,8 @@
             });
             const result = await readApiJson(response);
             currentSha = result.content?.sha || currentSha;
-            showStatus("Gespeichert! GitHub Pages veröffentlicht die neue Konfiguration nach kurzer Zeit.", true);
+            loadedConfig = finalConfig;
+            showStatus("Gespeichert! Die aktuelle und die vorherige Nachricht bleiben in der Kassen-App sichtbar.", true);
         } catch (e) {
             showStatus("Speichern fehlgeschlagen: " + e.message, false);
         } finally {
