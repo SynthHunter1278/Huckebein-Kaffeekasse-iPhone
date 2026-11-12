@@ -1,17 +1,18 @@
-HUCKEBEIN-KAFFEEKASSE – ADMIN-OPTIONEN
+Huckebein-Kaffeekasse – Anzeige der letzten Nachricht und Geburtstagskaffee
 
-Diese Aktualisierung enthält zwei Änderungen:
-1. In der Admin-App können einzelne Produkte ein- und ausgeblendet werden.
-2. In der Admin-App lässt sich die PayPal-Aufladung global ein- und ausschalten.
+Bitte im GitHub-Hauptverzeichnis diese beiden Dateien ersetzen:
+- index.html
+- sw.js
 
-Einbau:
-- admin.html im Hauptverzeichnis des GitHub-Repositories ersetzen.
-- index.html im Hauptverzeichnis des GitHub-Repositories ersetzen.
-- config.json NICHT manuell ersetzen. Die Admin-App erweitert die Konfiguration beim nächsten Speichern automatisch.
-- sw.js und alle anderen Dateien bleiben unverändert.
+Die Datei sw.js muss exakt sw.js heißen (nicht sw.js.txt).
+Danach beide Änderungen mit Commit changes speichern.
 
-Nach dem Hochladen beide Apps neu öffnen. In der Admin-App die gewünschten Produkt-Schalter und den PayPal-Schalter setzen und einmal auf „Speichern & Live schalten“ drücken.
+Die Admin-App (admin.html), config.json sowie Guthaben und lokale Buchungen
+werden nicht ersetzt oder gelöscht.
 
-Standards für alte config.json:
-- Produkte ohne gespeicherten Verfügbarkeitswert bleiben sichtbar.
-- PayPal bleibt aktiviert, solange es nicht ausdrücklich deaktiviert wurde.
+Änderungen:
+- Die aktuelle Admin-Nachricht wird als gut lesbares Feld mit Überschrift angezeigt.
+- Die Geburtstagskaffee-Information erscheint als großer grüner Hinweis.
+- Dieser Hinweis blinkt beim Öffnen der Kassen-App und nach dem Zurückkehren
+  aus dem Hintergrund ungefähr sechs Sekunden lang.
+- Der Service Worker verwendet v6, damit er die neue index.html laden kann.

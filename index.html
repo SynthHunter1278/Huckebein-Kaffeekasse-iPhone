@@ -93,7 +93,64 @@
         .access-card button { width: 100%; padding: 13px; margin-top: 12px; background: #2c3e50; color: white; border: 0; border-radius: 8px; font-weight: bold; font-size: 16px; }
         .access-error { color: #b91c1c; min-height: 20px; font-size: 13px; margin-top: 10px; }
         .access-note { font-size: 12px; color: #64748b; line-height: 1.45; margin-top: 14px; }
-        #noticeBanner { display:none; padding:12px; border-radius:8px; margin-bottom:14px; font-size:14px; font-weight:bold; }
+        /* Deutlich sichtbares Feld für die zuletzt von der Administration geschaltete Nachricht */
+        #noticeBanner {
+            display:none;
+            padding:15px 16px;
+            border:2px solid #93c5fd;
+            border-radius:10px;
+            margin-bottom:14px;
+            font-size:18px;
+            font-weight:700;
+            line-height:1.4;
+            overflow-wrap:anywhere;
+            box-shadow:0 2px 7px rgba(30,64,175,.08);
+        }
+        .notice-heading {
+            display:block;
+            margin-bottom:6px;
+            font-size:12px;
+            font-weight:800;
+            letter-spacing:.05em;
+            text-transform:uppercase;
+            opacity:.85;
+        }
+        #noticeText { white-space:pre-wrap; }
+
+        /* Geburtstagskaffee: große grüne Anzeige, die beim Öffnen und Zurückkehren kurz blinkt */
+        #birthdayBanner {
+            display:none;
+            padding:16px;
+            margin-bottom:14px;
+            border:2px solid #16a34a;
+            border-radius:12px;
+            background:#ecfdf5;
+            color:#166534;
+            text-align:center;
+            box-shadow:0 2px 8px rgba(22,163,74,.10);
+        }
+        .birthday-title {
+            font-size:19px;
+            line-height:1.3;
+            font-weight:900;
+            letter-spacing:.02em;
+        }
+        .birthday-detail {
+            margin-top:6px;
+            font-size:17px;
+            line-height:1.35;
+            font-weight:700;
+        }
+        #birthdayBanner.blink-active {
+            animation:birthdayBlink .75s steps(2, end) infinite;
+        }
+        @keyframes birthdayBlink {
+            0%, 100% { background:#ecfdf5; border-color:#16a34a; box-shadow:0 2px 8px rgba(22,163,74,.10); }
+            50% { background:#bbf7d0; border-color:#14532d; box-shadow:0 0 0 4px rgba(34,197,94,.22); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #birthdayBanner.blink-active { animation:none; outline:3px solid #22c55e; }
+        }
     </style>
 </head>
 <body onload="startApp()">
@@ -122,7 +179,16 @@
 
 <div class="container">
     <h1>☕ Hans Huckebein Kaffeekasse</h1>
-    <div id="noticeBanner" role="status"></div>
+
+    <div id="birthdayBanner" role="status" aria-live="polite">
+        <div class="birthday-title">🎉 GEBURTSTAGSKAFFEE GRATIS!</div>
+        <div id="birthdayText" class="birthday-detail">Der Automatenkaffee ist für alle kostenlos.</div>
+    </div>
+
+    <div id="noticeBanner" role="status" aria-live="polite">
+        <span class="notice-heading">📢 Nachricht an alle</span>
+        <div id="noticeText"></div>
+    </div>
 
     <div class="saldo-box">
         <div class="saldo-title">Dein Guthaben</div>
@@ -231,6 +297,7 @@
             document.getElementById("accessGate").style.display = "none";
             await loadPublicConfig();
             init();
+            triggerBirthdayAttention();
         } catch (e) {
             error.textContent = e.message || "Freischaltung nicht möglich.";
         }
@@ -241,6 +308,7 @@
             document.getElementById("accessGate").style.display = "none";
             await loadPublicConfig();
             init();
+            triggerBirthdayAttention();
         } else {
             document.getElementById("accessCodeInput").focus();
         }
@@ -275,20 +343,34 @@
             const giver = config.geburtstag?.spender || config.freeCoffee?.giver || "";
             const message = config.nachricht || config.message;
             const banner = document.getElementById("noticeBanner");
-            // Vor jeder Aktualisierung alte Anzeige zurücksetzen, damit deaktivierte
-            // Hinweise nach einer Rückkehr aus PayPal sofort verschwinden.
+            const messageText = document.getElementById("noticeText");
+            // Die zuletzt geschaltete Nachricht bleibt als gut lesbares Infofeld sichtbar,
+            // solange sie in der Admin-App aktiviert ist.
             banner.style.display = "none";
-            banner.textContent = "";
-            if (message?.aktiv || message?.active) {
-                banner.textContent = message.text || "";
-                banner.style.display = banner.textContent ? "block" : "none";
-                banner.style.background = (message.typ === "warnung" || message.color === "red") ? "#fee2e2" : "#dbeafe";
-                banner.style.color = (message.typ === "warnung" || message.color === "red") ? "#991b1b" : "#1e40af";
+            messageText.textContent = "";
+            if ((message?.aktiv || message?.active) && String(message.text || "").trim()) {
+                messageText.textContent = String(message.text).trim();
+                banner.style.display = "block";
+                const isWarning = message.typ === "warnung" || message.color === "red";
+                banner.style.background = isWarning ? "#fee2e2" : "#dbeafe";
+                banner.style.color = isWarning ? "#991b1b" : "#1e40af";
+                banner.style.borderColor = isWarning ? "#ef4444" : "#60a5fa";
             }
-            const sub = document.getElementById("saldo-subtext");
+
+            const birthdayBanner = document.getElementById("birthdayBanner");
+            const birthdayText = document.getElementById("birthdayText");
             if (birthdayCoffeeActive) {
-                if (sub) sub.textContent = "Geburtstagskaffee gratis" + (giver ? " – " + giver : "");
-            } else if (sub && benutzerName !== "Unbekannter Teilnehmer") {
+                birthdayText.textContent = giver
+                    ? "Heute spendiert " + giver + " den Kaffee für alle!"
+                    : "Der Automatenkaffee ist für alle kostenlos.";
+                birthdayBanner.style.display = "block";
+            } else {
+                birthdayBanner.style.display = "none";
+                birthdayBanner.classList.remove("blink-active");
+            }
+
+            const sub = document.getElementById("saldo-subtext");
+            if (sub && benutzerName !== "Unbekannter Teilnehmer") {
                 sub.textContent = "Einsatzbereit - Kasse von " + benutzerName;
             }
             return true;
@@ -340,6 +422,22 @@
         }, duration);
     }
 
+    let birthdayBlinkTimer = null;
+
+    function triggerBirthdayAttention() {
+        const banner = document.getElementById("birthdayBanner");
+        if (!banner || !birthdayCoffeeActive || banner.style.display === "none") return;
+        if (birthdayBlinkTimer) clearTimeout(birthdayBlinkTimer);
+        banner.classList.remove("blink-active");
+        // Reflow erzwingt einen Neustart der CSS-Animation, auch wenn sie gerade läuft.
+        void banner.offsetWidth;
+        banner.classList.add("blink-active");
+        birthdayBlinkTimer = setTimeout(() => {
+            banner.classList.remove("blink-active");
+            birthdayBlinkTimer = null;
+        }, 6000);
+    }
+
     async function refreshAfterExternalReturn() {
         if (document.visibilityState === "hidden") {
             appWasBackgrounded = true;
@@ -359,7 +457,8 @@
                 appWasBackgrounded = true;
                 return;
             }
-            await loadPublicConfig();
+            const configLoaded = await loadPublicConfig();
+            if (configLoaded) triggerBirthdayAttention();
             checkPendingPaypalCode();
             updateSaldoDisplay();
         })();
