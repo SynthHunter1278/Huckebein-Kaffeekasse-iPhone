@@ -3,7 +3,16 @@
     "aktiv": false,
     "spender": "Uwe",
     "datum": "2026-11-13",
-    "abrechnung": null,
+    "abrechnung": {
+      "id": "GEB-20261113-1794585174395",
+      "spender": "Uwe",
+      "datum": "2026-11-13",
+      "anzahl": 12,
+      "einzelpreis": 0.5,
+      "gesamt": 6,
+      "status": "offen",
+      "erstellt": "2026-11-13T15:52:54.395Z"
+    },
     "archiv": []
   },
   "nachricht": {
