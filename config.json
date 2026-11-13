@@ -6,7 +6,7 @@
   },
   "nachricht": {
     "aktiv": true,
-    "text": "Keine neue Nachricht",
+    "text": "Schönes Wochenende",
     "typ": "info"
   },
   "preise": {
@@ -37,7 +37,7 @@
     "aktiv": false
   },
   "letzteNachricht": {
-    "text": "Liebe Tester, ich habe Änderungen an der Strucktur der App vorgenommen.",
+    "text": "Keine neue Nachricht",
     "typ": "info"
   }
 }
