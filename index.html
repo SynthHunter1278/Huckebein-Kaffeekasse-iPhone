@@ -79,6 +79,19 @@
         .cash-input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 15px; text-align: center; font-weight: bold; letter-spacing: 2px; }
         .btn-cash-submit { background-color: #8e44ad; justify-content: center; font-size: 14px; margin: 0; width: auto; padding: 10px 18px; }
 
+        .birthday-sponsor-card { margin: 0 0 14px; padding: 12px; border: 1px solid #f59e0b; border-radius: 10px; background: #fffbeb; text-align: center; }
+        .birthday-sponsor-card p { margin: 5px 0 10px; font-size: 13px; line-height: 1.4; color: #92400e; }
+        .birthday-sponsor-btn { width:100%; padding:11px; border:0; border-radius:8px; background:#d97706; color:#fff; font-weight:bold; font-size:14px; }
+        .birthday-sponsor-btn:disabled { opacity:.65; }
+        .settlement-overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:18px; box-sizing:border-box; background:rgba(15,23,42,.72); z-index:15000; }
+        .settlement-card { width:100%; max-width:390px; padding:22px; box-sizing:border-box; border-radius:14px; background:#fff; color:#1f2937; box-shadow:0 12px 35px rgba(0,0,0,.25); text-align:center; }
+        .settlement-card h2 { margin:0 0 12px; color:#166534; font-size:21px; }
+        .settlement-total { margin:10px 0; font-size:34px; font-weight:900; color:#166534; }
+        .settlement-confirm-btn { width:100%; padding:14px; border:0; border-radius:8px; background:#16a34a; color:#fff; font-weight:800; font-size:15px; }
+        .settlement-note { color:#64748b; font-size:12px; line-height:1.45; margin:12px 0; }
+        .saldo-negative { background:#fef2f2 !important; border-color:#fecaca !important; }
+        .saldo-negative .saldo-amount { color:#dc2626 !important; }
+        .saldo-negative .saldo-title { color:#991b1b !important; }
         .confirm-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 9999; }
         .confirm-box { background: white; padding: 20px; border-radius: 12px; width: 85%; max-width: 340px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); text-align: center; }
         .confirm-box p { font-size: 16px; font-weight: bold; color: #2c3e50; margin: 0 0 20px 0; line-height: 1.4; }
@@ -177,12 +190,31 @@
     </div>
 </div>
 
+<div id="birthdaySettlementOverlay" class="settlement-overlay" role="dialog" aria-modal="true" aria-labelledby="birthdaySettlementTitle">
+    <div class="settlement-card">
+        <h2 id="birthdaySettlementTitle">☕ Deine Geburtstagskaffee-Abrechnung</h2>
+        <p id="birthdaySettlementGreeting">Hallo!</p>
+        <p id="birthdaySettlementDetails"></p>
+        <div id="birthdaySettlementTotal" class="settlement-total">0,00 €</div>
+        <p id="birthdaySettlementBalance" class="settlement-note"></p>
+        <button type="button" class="settlement-confirm-btn" onclick="confirmBirthdaySettlement()">Abrechnung bestätigen und abbuchen</button>
+        <p class="settlement-note">Der vollständige Betrag wird einmalig von deinem Guthaben abgezogen. Reicht das Guthaben nicht aus, wird es negativ; Produktbuchungen bleiben bis zur Aufladung gesperrt.</p>
+    </div>
+</div>
+
 <div class="container">
     <h1>☕ Hans Huckebein Kaffeekasse</h1>
 
     <div id="birthdayBanner" role="status" aria-live="polite">
         <div class="birthday-title">🎉 GEBURTSTAGSKAFFEE GRATIS!</div>
         <div id="birthdayText" class="birthday-detail">Der Automatenkaffee ist für alle kostenlos.</div>
+    </div>
+
+    <div id="birthdaySponsorCard" class="birthday-sponsor-card">
+        <strong>🎂 Möchtest du Geburtstagskaffee spendieren?</strong>
+        <p>Mit einem Klick meldest du dich mit deinem gespeicherten App-Namen bei der Kassenverwaltung.</p>
+        <button type="button" id="birthdaySponsorButton" class="birthday-sponsor-btn" onclick="requestBirthdaySponsor()">Geburtstagskaffee anbieten</button>
+        <div id="birthdaySponsorStatus" class="small-note" style="margin-top:7px;color:#92400e;"></div>
     </div>
 
     <div id="previousNoticeBanner" role="status" aria-live="polite">
@@ -258,7 +290,18 @@
     const CODE_OFFSET = 418952;
     const DEFAULT_PRICES = { kaffee:0.50, cappuccino:0.60, wasser:0.60, soft33:0.90, soft5:0.90, schokokl:0.30, schokogr:0.60, eis:0.50, fruehstueck:4.00 };
     let prices = { ...DEFAULT_PRICES };
+    let birthdayEvent = { aktiv: false, spender: "", datum: "", abrechnung: null };
     let birthdayCoffeeActive = false;
+    let birthdaySettlement = null;
+    let pendingBirthdayFreeCoffee = false;
+    let pendingBirthdayCoffeeId = "";
+    const EMAIL_OUTBOX_KEY = "kaffeekasse_email_outbox_v1";
+    const BIRTHDAY_SETTLEMENTS_APPLIED_KEY = "kaffeekasse_birthday_settlements_applied_v1";
+    const BALANCE_STATE_KEY = "kaffeekasse_balance_state_v1";
+    let appliedBirthdaySettlementIds = [];
+    let emailOutboxSending = false;
+    let emailOutboxRetryTimer = null;
+    let birthdayClockTimer = null;
     const PRODUCT_IDS = {
         kaffee: "btn-kaffee", cappuccino: "btn-cappuccino", wasser: "btn-wasser",
         soft33: "btn-soft33", soft5: "btn-soft5", schokokl: "btn-schokokl",
@@ -278,6 +321,149 @@
     let usedCodes = [];
     let lastBreakfastWeek = ""; 
     let benutzerName = "Unbekannter Teilnehmer"; // Speichert den Namen des Gerätenutzers
+
+    function localDateString(date = new Date()) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+
+    function normalizeUserName(value) {
+        return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de-DE");
+    }
+
+    function isBirthdayEventToday() {
+        return Boolean(birthdayEvent.aktiv ?? birthdayEvent.active) && (birthdayEvent.datum || localDateString()) === localDateString();
+    }
+
+    function isBirthdayFreeWindowNow() {
+        if (!isBirthdayEventToday()) return false;
+        const now = new Date();
+        const minutes = now.getHours() * 60 + now.getMinutes();
+        return minutes >= 6 * 60 && minutes < 15 * 60;
+    }
+
+    function updateBirthdayTimeDisplay() {
+        const banner = document.getElementById("birthdayBanner");
+        const text = document.getElementById("birthdayText");
+        if (!banner || !text) return;
+        const wasVisible = banner.style.display !== "none";
+        if (!isBirthdayEventToday()) {
+            birthdayCoffeeActive = false;
+            banner.style.display = "none";
+            banner.classList.remove("blink-active");
+            applyPricesToButtons();
+            return;
+        }
+        birthdayCoffeeActive = true;
+        const minutes = new Date().getHours() * 60 + new Date().getMinutes();
+        const giver = birthdayEvent.spender || "";
+        if (minutes < 360) {
+            text.textContent = giver ? `Heute spendiert ${giver} den Kaffee für alle – kostenlos von 06:00 bis 15:00 Uhr.` : "Heute gibt es Automatenkaffee von 06:00 bis 15:00 Uhr kostenlos.";
+        } else if (minutes < 900) {
+            text.textContent = giver ? `Heute spendiert ${giver} den Kaffee für alle – GRATIS bis 15:00 Uhr!` : "Der Automatenkaffee ist bis 15:00 Uhr kostenlos.";
+        } else {
+            text.textContent = "Die kostenlose Kaffeephase ist beendet. Vielen Dank!";
+        }
+        banner.style.display = "block";
+        if (!wasVisible) triggerBirthdayAttention();
+        applyPricesToButtons();
+        if (appReady) updateSaldoDisplay();
+    }
+
+    function scheduleBirthdayClockRefresh() {
+        if (birthdayClockTimer) clearInterval(birthdayClockTimer);
+        birthdayClockTimer = setInterval(updateBirthdayTimeDisplay, 15000);
+    }
+
+    function makeEventId(prefix = "KK") {
+        const stamp = new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14);
+        const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+        return `${prefix}-${stamp}-${random}`;
+    }
+
+    function getAppliedBirthdaySettlementIds() {
+        try {
+            const state = JSON.parse(localStorage.getItem(BALANCE_STATE_KEY) || "null");
+            if (state && Array.isArray(state.appliedBirthdaySettlementIds)) {
+                appliedBirthdaySettlementIds = state.appliedBirthdaySettlementIds;
+                return appliedBirthdaySettlementIds;
+            }
+            const value = JSON.parse(localStorage.getItem(BIRTHDAY_SETTLEMENTS_APPLIED_KEY) || "[]");
+            appliedBirthdaySettlementIds = Array.isArray(value) ? value : [];
+            return appliedBirthdaySettlementIds;
+        } catch (_) { return appliedBirthdaySettlementIds; }
+    }
+
+    function persistBalanceState() {
+        const state = {
+            balance: Math.round(meinSaldo * 100) / 100,
+            appliedBirthdaySettlementIds: Array.isArray(appliedBirthdaySettlementIds) ? appliedBirthdaySettlementIds : []
+        };
+        // Ein zusammengefasster Speicherwert hält Saldo und Abbuchungs-IDs konsistent.
+        localStorage.setItem(BALANCE_STATE_KEY, JSON.stringify(state));
+        localStorage.setItem("kaffeekasse_saldo_final", state.balance.toString());
+        localStorage.setItem(BIRTHDAY_SETTLEMENTS_APPLIED_KEY, JSON.stringify(state.appliedBirthdaySettlementIds));
+    }
+
+    function queueEmailNotification(templateParams) {
+        const entry = { id: templateParams.notification_id || makeEventId("MAIL"), params: templateParams };
+        try {
+            const queue = JSON.parse(localStorage.getItem(EMAIL_OUTBOX_KEY) || "[]");
+            const safeQueue = Array.isArray(queue) ? queue : [];
+            if (!safeQueue.some(item => item && item.id === entry.id)) {
+                safeQueue.push(entry);
+                localStorage.setItem(EMAIL_OUTBOX_KEY, JSON.stringify(safeQueue));
+            }
+        } catch (error) {
+            console.warn("E-Mail konnte nicht lokal vorgemerkt werden:", error);
+        }
+        flushEmailOutbox();
+        return entry.id;
+    }
+
+    async function flushEmailOutbox() {
+        if (emailOutboxSending || !window.emailjs) return;
+        emailOutboxSending = true;
+        try {
+            while (true) {
+                let queue;
+                try {
+                    queue = JSON.parse(localStorage.getItem(EMAIL_OUTBOX_KEY) || "[]");
+                    if (!Array.isArray(queue)) queue = [];
+                } catch (_) { queue = []; }
+                if (!queue.length) break;
+                const entry = queue[0];
+                try {
+                    await emailjs.send("service_j85pq0k", "template_7an5vbo", entry.params);
+                    // Während des Versands können weitere Tassen in die lokale Warteschlange kommen.
+                    // Deshalb die aktuelle Liste erneut lesen und nur die bestätigte ID entfernen.
+                    let latestQueue;
+                    try {
+                        latestQueue = JSON.parse(localStorage.getItem(EMAIL_OUTBOX_KEY) || "[]");
+                        if (!Array.isArray(latestQueue)) latestQueue = [];
+                    } catch (_) { latestQueue = []; }
+                    latestQueue = latestQueue.filter(item => item && item.id !== entry.id);
+                    localStorage.setItem(EMAIL_OUTBOX_KEY, JSON.stringify(latestQueue));
+                    if (latestQueue.length) await new Promise(resolve => setTimeout(resolve, 1150));
+                } catch (error) {
+                    console.error("E-Mail konnte nicht gesendet werden; sie bleibt für einen späteren Versuch gespeichert:", error);
+                    if (!emailOutboxRetryTimer) {
+                        emailOutboxRetryTimer = setTimeout(() => {
+                            emailOutboxRetryTimer = null;
+                            flushEmailOutbox();
+                        }, 30000);
+                    }
+                    break;
+                }
+            }
+        } finally {
+            emailOutboxSending = false;
+        }
+    }
+
+    window.addEventListener("online", flushEmailOutbox);
 
     async function sha256Hex(value) {
         if (!window.crypto || !crypto.subtle) throw new Error("Sichere Codeprüfung ist in diesem Browser nicht verfügbar.");
@@ -343,8 +529,10 @@
                 Object.values(PRODUCT_IDS).map(id => [id, sourceVisibility[id] !== false])
             );
             paypalEnabled = Boolean(config.paypal?.aktiv ?? config.paypalEnabled ?? true);
-            birthdayCoffeeActive = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
-            const giver = config.geburtstag?.spender || config.freeCoffee?.giver || "";
+            birthdayEvent = config.geburtstag || config.freeCoffee || { aktiv: false, spender: "", datum: "", abrechnung: null };
+            birthdayCoffeeActive = isBirthdayEventToday();
+            birthdaySettlement = birthdayEvent.abrechnung || null;
+            const giver = birthdayEvent.spender || birthdayEvent.giver || "";
             const message = config.nachricht || config.message;
             const remotePreviousMessage = config.letzteNachricht || config.lastMessage;
             const banner = document.getElementById("noticeBanner");
@@ -418,17 +606,9 @@
                 }
             }
 
-            const birthdayBanner = document.getElementById("birthdayBanner");
-            const birthdayText = document.getElementById("birthdayText");
-            if (birthdayCoffeeActive) {
-                birthdayText.textContent = giver
-                    ? "Heute spendiert " + giver + " den Kaffee für alle!"
-                    : "Der Automatenkaffee ist für alle kostenlos.";
-                birthdayBanner.style.display = "block";
-            } else {
-                birthdayBanner.style.display = "none";
-                birthdayBanner.classList.remove("blink-active");
-            }
+            updateBirthdayTimeDisplay();
+            scheduleBirthdayClockRefresh();
+            refreshBirthdaySponsorUi();
 
             const sub = document.getElementById("saldo-subtext");
             if (sub && benutzerName !== "Unbekannter Teilnehmer") {
@@ -446,7 +626,7 @@
     function getPriceForItem(itemName, fallback) {
         const keys = { "Automaten Kaffee":"kaffee", "Cappuccino":"cappuccino", "Wasser 0,7L":"wasser", "Softdrink 0,33L":"soft33", "Softdrink 0,5L":"soft5", "Schokoriegel klein":"schokokl", "Schokoriegel groß":"schokogr", "Eiscreme":"eis", "Freitagsfrühstück":"fruehstueck" };
         const key = keys[itemName];
-        if (key === "kaffee" && birthdayCoffeeActive) return 0;
+        if (key === "kaffee" && isBirthdayFreeWindowNow()) return 0;
         return key ? prices[key] : fallback;
     }
 
@@ -456,7 +636,7 @@
             const button = document.getElementById(id);
             if (!button) continue;
             button.style.display = productVisibility[id] === false ? "none" : "";
-            const amount = key === "kaffee" && birthdayCoffeeActive ? 0 : prices[key];
+            const amount = key === "kaffee" && isBirthdayFreeWindowNow() ? 0 : prices[key];
             const spans = button.querySelectorAll("span");
             if (spans.length) spans[spans.length - 1].textContent = amount.toFixed(2).replace(".", ",") + " €";
         }
@@ -487,7 +667,7 @@
 
     function triggerBirthdayAttention() {
         const banner = document.getElementById("birthdayBanner");
-        if (!banner || !birthdayCoffeeActive || banner.style.display === "none") return;
+        if (!banner || !isBirthdayEventToday() || banner.style.display === "none") return;
         if (birthdayBlinkTimer) clearTimeout(birthdayBlinkTimer);
         banner.classList.remove("blink-active");
         // Reflow erzwingt einen Neustart der CSS-Animation, auch wenn sie gerade läuft.
@@ -522,6 +702,9 @@
             if (configLoaded) triggerBirthdayAttention();
             checkPendingPaypalCode();
             updateSaldoDisplay();
+            refreshBirthdaySponsorUi();
+            checkPendingBirthdaySettlement();
+            flushEmailOutbox();
         })();
         try {
             await lifecycleRefreshInFlight;
@@ -563,6 +746,15 @@
                 localStorage.setItem('kaffeekasse_saldo_final', '0.00');
             }
             meinSaldo = parseFloat(localStorage.getItem('kaffeekasse_saldo_final'));
+            try {
+                const balanceState = JSON.parse(localStorage.getItem(BALANCE_STATE_KEY) || "null");
+                if (balanceState && Number.isFinite(Number(balanceState.balance))) {
+                    meinSaldo = Number(balanceState.balance);
+                    appliedBirthdaySettlementIds = Array.isArray(balanceState.appliedBirthdaySettlementIds) ? balanceState.appliedBirthdaySettlementIds : [];
+                } else {
+                    appliedBirthdaySettlementIds = getAppliedBirthdaySettlementIds();
+                }
+            } catch (_) { appliedBirthdaySettlementIds = getAppliedBirthdaySettlementIds(); }
             
             if (localStorage.getItem('kaffeekasse_used_codes') !== null) {
                 usedCodes = JSON.parse(localStorage.getItem('kaffeekasse_used_codes'));
@@ -594,10 +786,24 @@
         checkPendingPaypalCode();
         updateSaldoDisplay();
         appReady = true;
+        refreshBirthdaySponsorUi();
+        checkPendingBirthdaySettlement();
+        flushEmailOutbox();
     }
 
     function updateSaldoDisplay() {
-        document.getElementById('my-saldo').textContent = meinSaldo.toFixed(2).replace('.', ',') + " €";
+        const saldoElement = document.getElementById('my-saldo');
+        const saldoBox = document.querySelector('.saldo-box');
+        saldoElement.textContent = meinSaldo.toFixed(2).replace('.', ',') + " €";
+        if (saldoBox) saldoBox.classList.toggle('saldo-negative', meinSaldo < 0);
+        const saldoSubtext = document.getElementById('saldo-subtext');
+        if (saldoSubtext && meinSaldo < 0) {
+            saldoSubtext.textContent = "Guthaben im Minus – bitte aufladen. Produktbuchungen sind gesperrt.";
+            saldoSubtext.style.color = "#b91c1c";
+        } else if (saldoSubtext && benutzerName !== "Unbekannter Teilnehmer") {
+            saldoSubtext.textContent = "Einsatzbereit - Kasse von " + benutzerName;
+            saldoSubtext.style.color = "#95a5a6";
+        }
         
         updateButtonState('btn-kaffee', getPriceForItem('Automaten Kaffee', 0.50));
         updateButtonState('btn-cappuccino', getPriceForItem('Cappuccino', 0.60));
@@ -612,8 +818,10 @@
         // Der alte, aus Guthaben und Datum ableitbare Sicherungscode wird nicht mehr angezeigt.
 
         try {
-            localStorage.setItem('kaffeekasse_saldo_final', meinSaldo.toString());
-        } catch(e) {}
+            persistBalanceState();
+        } catch(e) {
+            console.warn("Guthaben konnte nicht dauerhaft gespeichert werden:", e);
+        }
 
         if (typeof checkFruehstueckDeadline === "function") {
             checkFruehstueckDeadline();
@@ -674,7 +882,12 @@ function getCalendarWeek(date) {
             showStatus(itemName + " ist derzeit nicht verfügbar.", false);
             return false;
         }
+        const birthdayFreeCoffee = itemName === "Automaten Kaffee" && isBirthdayFreeWindowNow();
         amount = getPriceForItem(itemName, amount);
+        if (meinSaldo < 0) {
+            showStatus("Dein Guthaben ist im Minus. Bitte zuerst aufladen; Produktbuchungen sind gesperrt.", false);
+            return false;
+        }
         if (itemName === 'Freitagsfrühstück' && checkFruehstueckSperre()) {
             if (lastBreakfastWeek === getCurrentWeekKey()) {
                 showStatus("Du hast das Freitagsfrühstück für diese Woche bereits gebucht!", false);
@@ -691,52 +904,189 @@ function getCalendarWeek(date) {
         
         pendingAmount = amount;
         pendingItemName = itemName;
-        window.pendingEmailTrigger = triggerEmail;
+        pendingBirthdayFreeCoffee = birthdayFreeCoffee;
+        pendingBirthdayCoffeeId = birthdayFreeCoffee ? makeEventId("GEB-KAFFEE") : "";
+        window.pendingEmailTrigger = triggerEmail || birthdayFreeCoffee;
 
-        document.getElementById('confirmMessage').innerHTML = `${itemName}<br>für ${amount.toFixed(2).replace('.', ',')} € wirklich buchen?`;
+        document.getElementById('confirmMessage').innerHTML = birthdayFreeCoffee
+            ? `${itemName}<br>GRATIS – diese Entnahme wird gezählt. Wirklich buchen?`
+            : `${itemName}<br>für ${amount.toFixed(2).replace('.', ',')} € wirklich buchen?`;
         document.getElementById('confirmOverlay').style.display = 'flex';
     }
 
     function closeConfirm(isConfirmed) {
         document.getElementById('confirmOverlay').style.display = 'none';
-        
-        if (isConfirmed && pendingAmount > 0) {
-            meinSaldo -= pendingAmount;
-            
-            if (pendingItemName === 'Freitagsfrühstück') {
-                lastBreakfastWeek = getCurrentWeekKey();
-                try {
-                    localStorage.setItem('kaffeekasse_last_breakfast', lastBreakfastWeek);
-                } catch(e) {}
-            }
 
-            updateSaldoDisplay();
-            showStatus(`Gebucht: ${pendingItemName} (-${pendingAmount.toFixed(2).replace('.', ',')} €)`, true);
-            
-            if (window.pendingEmailTrigger) {
-                sendBackgroundEmail(pendingItemName);
+        if (isConfirmed && pendingItemName && (pendingAmount > 0 || pendingBirthdayFreeCoffee)) {
+            if (pendingBirthdayFreeCoffee && !isBirthdayFreeWindowNow()) {
+                showStatus("Die kostenlose Kaffeephase ist inzwischen beendet. Bitte den Kaffee zum normalen Preis erneut buchen.", false);
+            } else {
+                meinSaldo = Math.round((meinSaldo - pendingAmount) * 100) / 100;
+
+                if (pendingItemName === 'Freitagsfrühstück') {
+                    lastBreakfastWeek = getCurrentWeekKey();
+                    try { localStorage.setItem('kaffeekasse_last_breakfast', lastBreakfastWeek); } catch(e) {}
+                }
+
+                updateSaldoDisplay();
+                if (pendingBirthdayFreeCoffee) {
+                    showStatus("Geburtstagskaffee gebucht. Die Entnahmemeldung wird übermittelt.", true);
+                    sendBackgroundEmail("Geburtstagskaffee GRATISENTNAHME | 1 Automatenkaffee | Buchungsnummer: " + pendingBirthdayCoffeeId,
+                        "☕ KAFFEEKASSE – GEBURTSTAGSKAFFEE – GRATISENTNAHME", pendingBirthdayCoffeeId);
+                } else {
+                    showStatus(`Gebucht: ${pendingItemName} (-${pendingAmount.toFixed(2).replace('.', ',')} €)`, true);
+                    if (window.pendingEmailTrigger) {
+                        sendBackgroundEmail(pendingItemName,
+                            pendingItemName === "Freitagsfrühstück" ? "KAFFEEKASSE – FRÜHSTÜCKSBUCHUNG" : "KAFFEEKASSE – BUCHUNG");
+                    }
+                }
             }
         }
-        
+
         pendingAmount = 0;
         pendingItemName = "";
+        pendingBirthdayFreeCoffee = false;
+        pendingBirthdayCoffeeId = "";
         window.pendingEmailTrigger = false;
     }
 
-    function sendBackgroundEmail(itemName) {
+    function sendBackgroundEmail(itemName, subject = "KAFFEEKASSE – BUCHUNG", notificationId = "") {
         const templateParams = {
+            subject,
             item: itemName,
-            user: benutzerName, // Übergibt den Namen des Teilnehmers an EmailJS
-            timestamp: new Date().toLocaleString('de-DE')
+            user: benutzerName,
+            timestamp: new Date().toLocaleString('de-DE'),
+            notification_id: notificationId || makeEventId("MAIL")
         };
+        queueEmailNotification(templateParams);
+    }
 
-        if (!window.emailjs) { console.warn("EmailJS ist nicht geladen."); return; }
-        emailjs.send("service_j85pq0k", "template_7an5vbo", templateParams)
-            .then(function(response) {
-                console.log('E-Mail im Hintergrund gesendet!');
-            }, function(error) {
-                console.error('Fehler beim E-Mail-Versand:', error);
-            });
+    function refreshBirthdaySponsorUi() {
+        const card = document.getElementById("birthdaySponsorCard");
+        const button = document.getElementById("birthdaySponsorButton");
+        const status = document.getElementById("birthdaySponsorStatus");
+        if (!card || !button || !status) return;
+        const key = "kaffeekasse_birthday_sponsor_request_" + new Date().getFullYear();
+        let alreadySent = false;
+        try { alreadySent = localStorage.getItem(key) === "1"; } catch (_) {}
+        const alreadyActiveSpender = birthdayEvent.spender && normalizeUserName(birthdayEvent.spender) === normalizeUserName(benutzerName) && (birthdayEvent.aktiv || birthdaySettlement);
+        if (alreadySent) {
+            button.disabled = true;
+            button.textContent = "Anmeldung bereits gesendet";
+            status.textContent = "Deine Spenderanmeldung wurde in diesem Jahr bereits versendet.";
+        } else if (alreadyActiveSpender) {
+            button.disabled = true;
+            button.textContent = "Geburtstagskaffee ist eingetragen";
+            status.textContent = "Du bist als Geburtstagsspender eingetragen.";
+        } else {
+            button.disabled = false;
+            button.textContent = "Geburtstagskaffee anbieten";
+            status.textContent = "Dein gespeicherter App-Anmeldename wird an die Verwaltung gesendet.";
+        }
+    }
+
+    async function requestBirthdaySponsor() {
+        const button = document.getElementById("birthdaySponsorButton");
+        const status = document.getElementById("birthdaySponsorStatus");
+        if (!benutzerName || benutzerName === "Unbekannter Teilnehmer" || benutzerName === "Anonymer Teilnehmer") {
+            showStatus("Es ist kein gültiger App-Anmeldename gespeichert.", false);
+            return;
+        }
+        const key = "kaffeekasse_birthday_sponsor_request_" + new Date().getFullYear();
+        try {
+            if (localStorage.getItem(key) === "1") {
+                showStatus("Deine Spenderanmeldung wurde in diesem Jahr bereits versendet.", false);
+                refreshBirthdaySponsorUi();
+                return;
+            }
+        } catch (_) {}
+        button.disabled = true;
+        button.textContent = "⏳ Sende Anmeldung...";
+        const requestId = makeEventId("SPENDER");
+        const params = {
+            subject: "☕ KAFFEEKASSE – GEBURTSTAGSKAFFEE – SPENDERANMELDUNG",
+            item: "GEBURTSTAGSKAFFEE – SPENDERANMELDUNG | Anmelde-ID: " + requestId,
+            user: benutzerName,
+            timestamp: new Date().toLocaleString("de-DE"),
+            notification_id: requestId
+        };
+        try {
+            if (!window.emailjs) throw new Error("EmailJS ist noch nicht geladen. Bitte Internetverbindung prüfen.");
+            await emailjs.send("service_j85pq0k", "template_7an5vbo", params);
+            try { localStorage.setItem(key, "1"); } catch (_) {}
+            status.textContent = "Anmeldung wurde an die Kassenverwaltung gesendet.";
+            showStatus("Geburtstagskaffee-Anmeldung erfolgreich versendet. Die Verwaltung aktiviert die Aktion.", true);
+        } catch (error) {
+            button.disabled = false;
+            button.textContent = "Geburtstagskaffee anbieten";
+            showStatus("Anmeldung konnte nicht versendet werden: " + (error?.text || error?.message || "EmailJS-Fehler"), false);
+        }
+        refreshBirthdaySponsorUi();
+    }
+
+    function checkPendingBirthdaySettlement() {
+        const overlay = document.getElementById("birthdaySettlementOverlay");
+        if (!overlay || !birthdaySettlement || birthdaySettlement.status !== "offen") {
+            if (overlay) overlay.style.display = "none";
+            return;
+        }
+        const spender = normalizeUserName(birthdaySettlement.spender || birthdayEvent.spender);
+        if (!spender || spender !== normalizeUserName(benutzerName)) {
+            overlay.style.display = "none";
+            return;
+        }
+        const id = String(birthdaySettlement.id || "").trim();
+        if (!id || getAppliedBirthdaySettlementIds().includes(id)) {
+            overlay.style.display = "none";
+            return;
+        }
+        const count = Number(birthdaySettlement.anzahl) || 0;
+        const unit = Number(birthdaySettlement.einzelpreis) || 0;
+        const total = Number(birthdaySettlement.gesamt);
+        const safeTotal = Number.isFinite(total) && total >= 0 ? Math.round(total * 100) / 100 : Math.round(count * unit * 100) / 100;
+        document.getElementById("birthdaySettlementGreeting").textContent = "Hallo " + benutzerName + "!";
+        document.getElementById("birthdaySettlementDetails").textContent = `Deine Kollegen haben ${count} kostenlose Kaffees genommen (${count} × ${unit.toFixed(2).replace(".", ",")} €).`;
+        document.getElementById("birthdaySettlementTotal").textContent = safeTotal.toFixed(2).replace(".", ",") + " €";
+        document.getElementById("birthdaySettlementBalance").textContent = `Dein aktuelles Guthaben: ${meinSaldo.toFixed(2).replace(".", ",")} €. Nach Bestätigung: ${(meinSaldo - safeTotal).toFixed(2).replace(".", ",")} €.`;
+        overlay.style.display = "flex";
+    }
+
+    function confirmBirthdaySettlement() {
+        if (!birthdaySettlement || birthdaySettlement.status !== "offen") return;
+        const id = String(birthdaySettlement.id || "").trim();
+        if (!id || normalizeUserName(birthdaySettlement.spender || birthdayEvent.spender) !== normalizeUserName(benutzerName)) return;
+        const appliedIds = getAppliedBirthdaySettlementIds();
+        if (appliedIds.includes(id)) {
+            document.getElementById("birthdaySettlementOverlay").style.display = "none";
+            return;
+        }
+        const count = Number(birthdaySettlement.anzahl) || 0;
+        const totalRaw = Number(birthdaySettlement.gesamt);
+        const total = Number.isFinite(totalRaw) && totalRaw >= 0 ? Math.round(totalRaw * 100) / 100 : Math.round(count * (Number(birthdaySettlement.einzelpreis) || 0) * 100) / 100;
+        const balanceBefore = meinSaldo;
+        const newBalance = Math.round((meinSaldo - total) * 100) / 100;
+        // Saldo und bereits angewendete Abrechnungs-ID werden in einem JSON-Wert gesichert.
+        try {
+            appliedBirthdaySettlementIds = [...appliedIds, id];
+            meinSaldo = newBalance;
+            persistBalanceState();
+        } catch (error) {
+            appliedBirthdaySettlementIds = appliedIds;
+            meinSaldo = balanceBefore;
+            showStatus("Die Abrechnung konnte nicht sicher auf diesem Gerät gespeichert werden. Bitte Browser-Speicher prüfen und erneut versuchen.", false);
+            return;
+        }
+        updateSaldoDisplay();
+        document.getElementById("birthdaySettlementOverlay").style.display = "none";
+        showStatus(`Geburtstagskaffee-Abrechnung ${id} bestätigt: ${total.toFixed(2).replace(".", ",")} € abgezogen.`, true);
+        const notificationId = "BESTAETIGT-" + id;
+        queueEmailNotification({
+            subject: "☕ KAFFEEKASSE – GEBURTSTAGSKAFFEE – ABBUCHUNG BESTÄTIGT",
+            item: `GEBURTSTAGSKAFFEE – ABBUCHUNG BESTÄTIGT | Abrechnungs-ID: ${id} | ${count} Kaffees | Betrag: ${total.toFixed(2).replace(".", ",")} € | Saldo vorher: ${balanceBefore.toFixed(2).replace(".", ",")} € | Saldo danach: ${newBalance.toFixed(2).replace(".", ",")} €`,
+            user: benutzerName,
+            timestamp: new Date().toLocaleString("de-DE"),
+            notification_id: notificationId
+        });
     }
 
     function showStatus(msg, isSuccess) {
@@ -777,9 +1127,13 @@ function getCalendarWeek(date) {
                 localStorage.removeItem('kaffeekasse_pending_code');
             } catch(e) {}
 
-            meinSaldo += calculatedAmount; 
+            meinSaldo = Math.round((meinSaldo + calculatedAmount) * 100) / 100;
             updateSaldoDisplay();
-            showStatus(`${calculatedAmount.toFixed(2).replace('.', ',')} € erfolgreich aufgeladen!`, true);
+            if (meinSaldo < 0) {
+                showStatus(`${calculatedAmount.toFixed(2).replace('.', ',')} € aufgeladen. Es bleiben noch ${Math.abs(meinSaldo).toFixed(2).replace('.', ',')} € offen; Produktbuchungen bleiben gesperrt.`, false);
+            } else {
+                showStatus(`${calculatedAmount.toFixed(2).replace('.', ',')} € erfolgreich aufgeladen!`, true);
+            }
             inputField.value = '';
             // Aufladecode und offener PayPal-Vorgang nach erfolgreicher Buchung entfernen.
             try { localStorage.removeItem('kaffeekasse_pending_code'); } catch(e) {}

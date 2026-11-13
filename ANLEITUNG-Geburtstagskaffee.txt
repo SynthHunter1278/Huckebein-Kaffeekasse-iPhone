@@ -1,0 +1,119 @@
+HUCKEBEIN-KAFFEEKASSE – ERWEITERUNG GEBURTSTAGSKAFFEE
+====================================================
+
+ENTHALTENE DATEIEN
+------------------
+admin.html  – Admin-Oberfläche mit Spender, Datum, Zählung und Abrechnung
+index.html  – Kassen-App mit Spender-Anmeldung, Gratis-Kaffee-Meldung und Abbuchung
+sw.js       – Service Worker v6 (Netzwerk zuerst für App und config.json)
+
+EINBAU IN GITHUB
+----------------
+1. ZIP entpacken.
+2. Die drei Dateien admin.html, index.html und sw.js in das Hauptverzeichnis
+   des vorhandenen GitHub-Repositories kopieren und die gleichnamigen Dateien
+   ersetzen.
+3. config.json NICHT ersetzen oder mit einer Beispieldatei überschreiben.
+   Die bestehende config.json enthält eure Live-Einstellungen und bleibt erhalten.
+4. In GitHub alle drei Änderungen mit „Commit changes“ speichern.
+
+WICHTIG: EMAILJS-TEMPLATE EINMALIG ANPASSEN
+-----------------------------------------
+Die Kassen-App verwendet für Spenderanmeldung, Gratis-Kaffee-Entnahmen,
+Frühstücksbuchungen und Abrechnungsbestätigung das vorhandene Template:
+
+  Service ID:  service_j85pq0k
+  Template ID: template_7an5vbo
+
+Damit jede Meldungsart einen eigenen, gut erkennbaren Betreff erhält, muss
+im EmailJS-Dashboard beim Template template_7an5vbo das Feld „Subject“ auf
+folgenden dynamischen Wert gesetzt werden:
+
+  {{subject}}
+
+Das ist wichtig: Die App übergibt den Betreff als Variable „subject“.
+EmailJS ersetzt diese Variable im Subject-Feld, wenn sie dort eingetragen ist.
+
+Im Mailtext sollten diese drei Variablen enthalten sein:
+
+  {{user}}
+  {{item}}
+  {{timestamp}}
+
+Die feste Empfängeradresse („To Email“) im Template bitte unverändert auf
+die Adresse der Kassenverwaltung eingestellt lassen. Die PayPal-Vorlage
+(template_3eki0ij) bleibt unverändert.
+
+ABLAUF: GEBURTSTAGSSPENDER MELDET SICH
+-------------------------------------
+1. In der Kassen-App auf „Geburtstagskaffee anbieten“ tippen.
+2. Die App sendet den bereits gespeicherten App-Anmeldenamen an die Verwaltung.
+   Betreff: KAFFEEKASSE – GEBURTSTAGSKAFFEE – SPENDERANMELDUNG
+3. Den Anmeldenamen aus der E-Mail exakt in der Admin-App in das Feld
+   „App-Anmeldename des Geburtstagsspenders“ übernehmen.
+4. In der Admin-App das Datum der Geburtstagsaktion einstellen, den Schalter
+   „Aktion aktiv“ einschalten und „Speichern & Live schalten“ verwenden.
+
+ABLAUF: KOSTENLOSER KAFFEE
+--------------------------
+- Nur „Automaten Kaffee“ ist am eingestellten Datum zwischen 06:00 und
+  14:59 Uhr kostenlos. Ab 15:00 Uhr gilt wieder der normale Preis.
+- Der Nutzer muss die normale Buchungsbestätigung „Jetzt buchen“ bestätigen.
+- Erst nach dieser Bestätigung wird eine Entnahmemeldung erzeugt.
+- Jede bestätigte Gratis-Tasse wird mit eigener Buchungs-ID per EmailJS gemeldet.
+  Betreff: KAFFEEKASSE – GEBURTSTAGSKAFFEE – GRATISENTNAHME
+- Die Meldungen werden bei vorübergehend fehlender Verbindung lokal in einer
+  Warteschlange auf dem jeweiligen Gerät gehalten und bei wiederhergestellter
+  Verbindung bzw. beim nächsten App-Aufruf erneut versendet. Vor der Abrechnung
+  deshalb prüfen, dass alle Entnahmemeldungen im Mailpostfach angekommen sind.
+
+ABLAUF: ABRECHNUNG NACH 15 UHR
+------------------------------
+1. Im Yahoo-Ordner „Hans Huckebein – Kaffeekasse“ die Mails mit dem Betreff
+   „GEBURTSTAGSKAFFEE – GRATISENTNAHME“ zählen.
+2. In der Admin-App die gezählte Anzahl in „Gezählte Gratis-Kaffees“ eintragen.
+   Der Betrag wird aus Anzahl × normalem Kaffeepreis berechnet.
+3. „Abrechnung veröffentlichen“ drücken. Die Admin-App lässt das erst nach
+   15:00 Uhr am eingestellten Aktionstag zu. Die Aktion wird dabei deaktiviert.
+4. Die Abrechnung wird in die bestehende config.json geschrieben. Die vorhandene
+   config.json wird nicht durch eine Datei aus diesem ZIP ersetzt.
+
+ABLAUF: SPENDER BESTÄTIGT DIE ABBUCHUNG
+--------------------------------------
+- Beim nächsten Laden der Kassen-App sieht nur das Gerät mit dem passenden
+  gespeicherten App-Anmeldenamen die persönliche Abrechnung.
+- Der Spender drückt „Abrechnung bestätigen und abbuchen“.
+- Der volle Betrag wird vom lokalen Guthaben dieses Geräts abgezogen. Das
+  Guthaben darf dabei negativ werden.
+- Bei negativem Guthaben sind Produktbuchungen gesperrt. Bar- und – sofern in
+  der Admin-App freigeschaltet – PayPal-Aufladungen bleiben möglich.
+- Aufladungen reduzieren das Minus. Erst bei Guthaben >= 0 sind Buchungen
+  wieder möglich (zusätzlich muss das Guthaben für den jeweiligen Artikel reichen).
+- Eine Abrechnungs-ID wird lokal mit dem Guthaben gespeichert, damit dieselbe
+  Abrechnung auf diesem Gerät bei erneutem Öffnen nicht ein zweites Mal abgezogen wird.
+- Die App sendet nach der Bestätigung eine E-Mail an die Kassenverwaltung.
+  Betreff: KAFFEEKASSE – GEBURTSTAGSKAFFEE – ABBUCHUNG BESTÄTIGT
+
+WICHTIGE GRENZEN DER BESTEHENDEN ARCHITEKTUR
+-------------------------------------------
+- Es wird keine zusätzliche Datenbank und keine Google-Tabelle verwendet.
+- Die Admin-App zählt die Entnahmen nicht automatisch. Die Zahl wird aus den
+  eingegangenen EmailJS-Meldungen manuell übernommen.
+- Das Guthaben bleibt wie bisher lokal auf dem jeweiligen Gerät gespeichert.
+  Die Abrechnungs-ID verhindert doppelte Abbuchung auf demselben Gerät, aber
+  nicht über mehrere Geräte mit demselben Anmeldenamen hinweg. Der Spender
+  sollte die Abrechnung daher auf seinem üblichen Kassen-Gerät bestätigen.
+- Der Spendername und die Abrechnungsdaten stehen in der öffentlich abrufbaren
+  config.json. Die App blendet die Abrechnung für andere Benutzernamen nur in
+  der Oberfläche aus; das ist keine Zugriffssperre für technisch versierte Leser.
+- EmailJS- und GitHub-Livezugriffe können hier nicht mit euren Konten getestet
+  werden. Vor dem regulären Einsatz bitte einen kontrollierten Test mit einer
+  Spenderanmeldung und einer einzelnen Gratis-Kaffee-Entnahme durchführen.
+
+BESTEHENDE FUNKTIONEN
+--------------------
+Vorhandene Preise, Produktverfügbarkeit, PayPal-Einstellung, Nachrichten,
+Guthaben, verwendete Aufladecodes und bestehende Konfiguration werden nicht
+absichtlich zurückgesetzt. Die Dateien in diesem Update enthalten nur die
+angepassten App-Dateien und den Service Worker; es liegt keine Ersatz-
+config.json bei.

@@ -11,7 +11,11 @@
         h2 { font-size: 14px; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid #475569; padding-bottom: 5px; margin-top: 20px; }
         .form-group { margin-bottom: 15px; }
         label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #cbd5e1; }
-        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 15px; box-sizing: border-box; }
+        input[type="text"], input[type="number"], input[type="date"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 15px; box-sizing: border-box; }
+        .btn-publish { width:100%; padding:13px; border:0; border-radius:8px; background:#16a34a; color:#fff; font-size:15px; font-weight:bold; cursor:pointer; margin:8px 0 14px; }
+        .btn-publish:disabled { opacity:.6; cursor:wait; }
+        .small-note { font-size:12px; color:#cbd5e1; line-height:1.45; }
+        .settlement-preview { background:#1e293b; border:1px solid #475569; border-radius:8px; padding:12px; margin:8px 0; color:#e2e8f0; }
         .flex-group { display: flex; align-items: center; gap: 10px; }
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; min-width: 44px; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -47,9 +51,24 @@
             <span>Aktion aktiv (Kaffee für alle GRATIS)</span>
         </div>
         <div class="form-group">
-            <label for="freeCoffeeGiver">Name des Geburtstagskinds / Spenders:</label>
-            <input type="text" id="freeCoffeeGiver" placeholder="z. B. Max Mustermann">
+            <label for="freeCoffeeGiver">App-Anmeldename des Geburtstagsspenders:</label>
+            <input type="text" id="freeCoffeeGiver" placeholder="z. B. Pete" autocomplete="off">
+            <p class="small-note">Den Namen exakt so eintragen, wie er in der Spenderanmeldung per E-Mail steht. Nur diese Kassen-App erhält später die persönliche Abrechnung.</p>
         </div>
+        <div class="form-group">
+            <label for="freeCoffeeDate">Tag der Geburtstagsaktion:</label>
+            <input type="date" id="freeCoffeeDate">
+        </div>
+        <p class="small-note">Der Automatenkaffee ist am eingetragenen Tag automatisch von 06:00 bis 15:00 Uhr kostenlos. Andere Produkte bleiben kostenpflichtig.</p>
+
+        <h2>🧾 Geburtstagskaffee-Abrechnung</h2>
+        <div class="form-group">
+            <label for="birthdayCoffeeCount">Gezählte Gratis-Kaffees (aus den E-Mails):</label>
+            <input type="number" id="birthdayCoffeeCount" min="1" max="1000" step="1" placeholder="z. B. 24">
+        </div>
+        <div class="settlement-preview" id="birthdaySettlementPreview">Bitte nach Ende der Freiphase die Entnahmemeldungen zählen und die Anzahl eintragen.</div>
+        <button type="button" class="btn-publish" id="publishBirthdayButton" onclick="publishBirthdaySettlement()">🧾 Abrechnung veröffentlichen</button>
+        <p class="small-note">Die Admin-App berechnet den Betrag aus Anzahl × normalem Kaffeepreis und veröffentlicht ihn in config.json. Der Spender bestätigt die Abbuchung in seiner eigenen Kassen-App.</p>
 
         <h2>📢 Nachricht an alle</h2>
         <div class="form-group flex-group">
@@ -215,8 +234,13 @@
             const config = JSON.parse(decodeBase64Utf8(data.content));
             loadedConfig = config;
 
-            document.getElementById("freeCoffeeActive").checked = Boolean(config.geburtstag?.aktiv ?? config.freeCoffee?.active);
-            document.getElementById("freeCoffeeGiver").value = config.geburtstag?.spender || config.freeCoffee?.giver || "";
+            const birthdayConfig = config.geburtstag || config.freeCoffee || {};
+            document.getElementById("freeCoffeeActive").checked = Boolean(birthdayConfig.aktiv ?? birthdayConfig.active);
+            document.getElementById("freeCoffeeGiver").value = birthdayConfig.spender || birthdayConfig.giver || "";
+            document.getElementById("freeCoffeeDate").value = birthdayConfig.datum || localDateString();
+            const existingSettlement = birthdayConfig.abrechnung || null;
+            document.getElementById("birthdayCoffeeCount").value = existingSettlement && existingSettlement.datum === document.getElementById("freeCoffeeDate").value ? existingSettlement.anzahl : "";
+            updateBirthdaySettlementPreview();
             document.getElementById("msgActive").checked = Boolean(config.nachricht?.aktiv ?? config.message?.active);
             document.getElementById("msgText").value = config.nachricht?.text || config.message?.text || "";
             document.getElementById("msgColor").value = (config.nachricht?.typ === "warnung" || config.message?.color === "red") ? "red" : "blue";
@@ -266,7 +290,7 @@
                 geburtstag: {
                     aktiv: document.getElementById("freeCoffeeActive").checked,
                     spender: document.getElementById("freeCoffeeGiver").value.trim(),
-                    datum: new Date().toISOString().slice(0,10)
+                    datum: document.getElementById("freeCoffeeDate").value || localDateString()
                 },
                 nachricht: {
                     aktiv: document.getElementById("msgActive").checked,
@@ -322,17 +346,19 @@
             const oldMessage = latestConfig.nachricht || latestConfig.message || {};
             const oldPrevious = latestConfig.letzteNachricht || latestConfig.lastMessage || null;
             const oldText = String(oldMessage.text || "").trim();
-            const oldActive = Boolean(oldMessage.aktiv ?? oldMessage.active);
             const newText = String(updatedConfig.nachricht.text || "").trim();
             const newActive = Boolean(updatedConfig.nachricht.aktiv);
             const oldType = oldMessage.typ || (oldMessage.color === "red" ? "warnung" : "info");
 
-            // Wenn eine neue aktive Nachricht veröffentlicht wird, wandert die
-            // bisherige aktive Nachricht in "letzteNachricht". Die vorherige Historie
-            // wird ersetzt, sodass immer genau die letzten beiden sichtbar sind.
+            // Bei Veröffentlichung eines anderen aktiven Textes wird der bisherige
+            // Text immer zur letzten Nachricht. Das gilt auch dann, wenn der alte
+            // Text zwischenzeitlich ausgeschaltet war.
             let previousMessage = oldPrevious;
-            if (newActive && newText && oldActive && oldText && oldText !== newText) {
+            if (newActive && newText && oldText && oldText !== newText) {
                 previousMessage = { text: oldText, typ: oldType };
+            }
+            if (previousMessage && typeof previousMessage === "string") {
+                previousMessage = { text: previousMessage, typ: "info" };
             }
             if (!previousMessage || !String(previousMessage.text || "").trim()) {
                 previousMessage = null;
@@ -343,7 +369,21 @@
                 };
             }
             updatedConfig.letzteNachricht = previousMessage;
-            const finalConfig = { ...latestConfig, ...updatedConfig };
+            const latestBirthday = latestConfig.geburtstag || latestConfig.freeCoffee || {};
+            const selectedSpender = String(updatedConfig.geburtstag.spender || "").trim();
+            const selectedDate = updatedConfig.geburtstag.datum;
+            let retainedSettlement = latestBirthday.abrechnung || null;
+            // Beim Wechsel auf einen anderen Spender oder ein anderes Aktionsdatum
+            // wird die alte Abrechnung archiviert und nicht dem neuen Geburtstag zugeordnet.
+            const archivedSettlements = Array.isArray(latestBirthday.archiv) ? [...latestBirthday.archiv] : [];
+            if (retainedSettlement && (retainedSettlement.spender !== selectedSpender || retainedSettlement.datum !== selectedDate)) {
+                archivedSettlements.push(retainedSettlement);
+                retainedSettlement = null;
+            }
+            updatedConfig.geburtstag.abrechnung = retainedSettlement;
+            updatedConfig.geburtstag.archiv = archivedSettlements;
+            const finalConfig = { ...latestConfig, ...updatedConfig,
+                geburtstag: { ...latestBirthday, ...updatedConfig.geburtstag } };
 
             const contentBase64 = btoa(Array.from(new TextEncoder().encode(JSON.stringify(finalConfig, null, 2)), b => String.fromCharCode(b)).join(""));
             const response = await fetch(apiUrl(), {
@@ -362,6 +402,128 @@
             saveButton.textContent = "💾 Speichern & Live schalten";
         }
     }
+
+    function localDateString(date = new Date()) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+
+    function updateBirthdaySettlementPreview() {
+        const rawCount = document.getElementById("birthdayCoffeeCount")?.value ?? "";
+        const count = Number(rawCount);
+        const price = Number(document.getElementById("p_kaffee")?.value);
+        const box = document.getElementById("birthdaySettlementPreview");
+        if (!box) return;
+        if (rawCount === "") {
+            box.textContent = "Bitte nach 15 Uhr die Anzahl der Gratis-Kaffees aus den E-Mails eintragen.";
+            return;
+        }
+        if (!Number.isInteger(count) || count < 1 || !Number.isFinite(price) || price < 0) {
+            box.textContent = "Bitte eine Anzahl ab 1 und einen gültigen Kaffeepreis eintragen.";
+            return;
+        }
+        const total = Math.round(count * price * 100) / 100;
+        box.innerHTML = `<strong>${count} Kaffees × ${price.toFixed(2).replace(".", ",")} € = ${total.toFixed(2).replace(".", ",")} €</strong><br><span class="small-note">Dieser Betrag wird dem Spender in seiner Kassen-App zur Bestätigung angezeigt.</span>`;
+    }
+
+    async function publishBirthdaySettlement() {
+        if (!checkCredentials()) return;
+        if (!configLoaded) {
+            showStatus("Zuerst müssen die aktuellen Live-Daten erfolgreich geladen sein.", false);
+            return;
+        }
+        const spender = document.getElementById("freeCoffeeGiver").value.trim();
+        const eventDate = document.getElementById("freeCoffeeDate").value;
+        const countRaw = document.getElementById("birthdayCoffeeCount").value;
+        const count = Number(countRaw);
+        const unitPrice = Number(document.getElementById("p_kaffee").value);
+        if (!spender) { showStatus("Bitte zuerst den App-Anmeldenamen des Geburtstagsspenders eintragen.", false); return; }
+        if (!eventDate) { showStatus("Bitte das Datum der Geburtstagsaktion eintragen.", false); return; }
+        if (countRaw === "" || !Number.isInteger(count) || count < 1 || count > 1000) {
+            showStatus("Bitte eine ganze Anzahl zwischen 1 und 1000 eintragen.", false); return;
+        }
+        if (!Number.isFinite(unitPrice) || unitPrice < 0 || unitPrice > 100) {
+            showStatus("Der normale Kaffeepreis ist ungültig.", false); return;
+        }
+        const endOfEvent = new Date(`${eventDate}T15:00:00`);
+        if (Date.now() < endOfEvent.getTime()) {
+            showStatus("Die Abrechnung kann erst nach 15:00 Uhr am Aktionstag veröffentlicht werden.", false); return;
+        }
+
+        const publishButton = document.getElementById("publishBirthdayButton");
+        publishButton.disabled = true;
+        publishButton.textContent = "⏳ Veröffentliche Abrechnung...";
+        try {
+            const getResponse = await fetchGetWithRetry(apiUrl() + "?cb=" + Date.now(), {
+                method: "GET", headers: githubHeaders(), cache: "no-store"
+            }, 3);
+            const current = await readApiJson(getResponse);
+            if (!current.sha || !current.content) throw new Error("GitHub lieferte keine vollständige config.json.");
+            const latestConfig = JSON.parse(decodeBase64Utf8(current.content));
+            const birthday = latestConfig.geburtstag || latestConfig.freeCoffee || {};
+            const existing = birthday.abrechnung || null;
+            if (existing && existing.status === "offen" && existing.spender === spender && existing.datum === eventDate) {
+                throw new Error(`Für ${spender} liegt bereits eine offene Abrechnung (${existing.id}) vor. Sie wird nicht überschrieben, damit keine Doppelbelastung entsteht.`);
+            }
+
+            const total = Math.round(count * unitPrice * 100) / 100;
+            const settlementId = `GEB-${eventDate.replace(/-/g, "")}-${Date.now()}`;
+            const settlement = {
+                id: settlementId,
+                spender,
+                datum: eventDate,
+                anzahl: count,
+                einzelpreis: Math.round(unitPrice * 100) / 100,
+                gesamt: total,
+                status: "offen",
+                erstellt: new Date().toISOString()
+            };
+            const archive = Array.isArray(birthday.archiv) ? [...birthday.archiv] : [];
+            if (existing && (existing.spender !== spender || existing.datum !== eventDate || existing.status !== "offen")) archive.push(existing);
+            const nextBirthday = {
+                ...birthday,
+                aktiv: false,
+                spender,
+                datum: eventDate,
+                abrechnung: settlement,
+                archiv: archive
+            };
+            const finalConfig = { ...latestConfig, geburtstag: nextBirthday };
+            const contentBase64 = btoa(Array.from(new TextEncoder().encode(JSON.stringify(finalConfig, null, 2)), b => String.fromCharCode(b)).join(""));
+            const response = await fetch(apiUrl(), {
+                method: "PUT",
+                headers: { ...githubHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ message: "Kaffeekasse: Geburtstagskaffee-Abrechnung veröffentlicht", content: contentBase64, sha: current.sha })
+            });
+            const result = await readApiJson(response);
+            currentSha = result.content?.sha || current.sha;
+            loadedConfig = finalConfig;
+            document.getElementById("freeCoffeeActive").checked = false;
+            showStatus(`Abrechnung ${settlementId} veröffentlicht: ${count} Kaffees = ${total.toFixed(2).replace(".", ",")} €. Der Spender sieht sie beim nächsten Neuladen.`, true);
+        } catch (e) {
+            showStatus("Abrechnung konnte nicht veröffentlicht werden: " + e.message, false);
+        } finally {
+            publishButton.disabled = false;
+            publishButton.textContent = "🧾 Abrechnung veröffentlichen";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        ["birthdayCoffeeCount", "p_kaffee"].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener("input", updateBirthdaySettlementPreview);
+        });
+        const birthdayDateInput = document.getElementById("freeCoffeeDate");
+        if (birthdayDateInput) birthdayDateInput.addEventListener("change", () => {
+            const loadedBirthday = loadedConfig.geburtstag || loadedConfig.freeCoffee || {};
+            if (birthdayDateInput.value !== (loadedBirthday.datum || "")) {
+                document.getElementById("birthdayCoffeeCount").value = "";
+                updateBirthdaySettlementPreview();
+            }
+        });
+    });
 
     function changeCredentials() {
         const token = prompt("Neuen GitHub Fine-grained Personal Access Token eingeben:");
