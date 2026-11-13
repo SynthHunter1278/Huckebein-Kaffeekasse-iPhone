@@ -1,12 +1,12 @@
 {
   "geburtstag": {
     "aktiv": false,
-    "spender": "der Admin",
-    "datum": "2026-11-12"
+    "spender": "",
+    "datum": "2026-11-13"
   },
   "nachricht": {
     "aktiv": true,
-    "text": "Nachrichten und Geburtstagkaffee Meldung sind jetzt übersichtlicher",
+    "text": "",
     "typ": "info"
   },
   "preise": {
