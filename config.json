@@ -1,8 +1,10 @@
 {
   "geburtstag": {
     "aktiv": false,
-    "spender": "",
-    "datum": "2026-11-13"
+    "spender": "Uwe",
+    "datum": "2026-11-13",
+    "abrechnung": null,
+    "archiv": []
   },
   "nachricht": {
     "aktiv": true,
