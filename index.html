@@ -249,6 +249,14 @@ button { -webkit-tap-highlight-color:transparent; }
   box-shadow:inset 0 0 0 3px rgba(8,24,38,.55),0 5px 13px rgba(0,0,0,.22);
   color:#eaf4fa; text-align:center;
 }
+/* Das Datumsinstrument ist eine reine Anzeige und darf keine Browseraktion auslösen. */
+.date-instrument {
+  pointer-events:none !important;
+  user-select:none;
+  -webkit-user-select:none;
+  cursor:default;
+}
+.date-instrument * { pointer-events:none !important; user-select:none; -webkit-user-select:none; }
 .side-instrument-label { color:#a9c3d5; font-size:clamp(6px,1.6vw,9px); font-weight:900; letter-spacing:.12em; }
 .date-weekday { color:var(--yellow); font-size:clamp(7px,1.9vw,10px); font-weight:900; letter-spacing:.06em; }
 .date-number { color:#fff; font-size:clamp(18px,5vw,29px); font-weight:900; line-height:1; font-variant-numeric:tabular-nums; }
@@ -300,6 +308,7 @@ button { -webkit-tap-highlight-color:transparent; }
   .instrument-cluster { --side-dial:47px; gap:2px; }
   .date-number { font-size:17px; }
   .clock-digital { font-size:9px; }
+  .saldo-amount { font-size:24px; }
 }
 
 /* EXAKTES HUCKEBEIN-KAFFEESTATIONSDESIGN: fotografischer Hangar-Header mit echten HTML-Overlays. */
@@ -359,7 +368,7 @@ body { min-height:100vh; background:radial-gradient(ellipse at 50% 12%,#173b58 0
 .gauge-needle polygon { fill:#ffc52e; }
 .gauge-hub { fill:#ffc52e; stroke:#fff4c2; stroke-width:2; }
 .gauge-digital { fill:#061725; stroke:#4c7189; stroke-width:1.5; }
-.saldo-amount { fill:#3fe59f; font-size:22px; font-weight:900; text-anchor:middle; dominant-baseline:middle; letter-spacing:.01em; }
+.saldo-amount { fill:#3fe59f; font-size:27px; font-weight:900; text-anchor:middle; dominant-baseline:middle; letter-spacing:0; }
 .saldo-negative .saldo-amount { fill:#ff6d77 !important; }
 .saldo-subtext { margin-top:5px; color:#9db9cd; font-size:10px; line-height:1.3; }
 .balance-status-row { display:flex; justify-content:center; align-items:center; gap:clamp(12px,8vw,80px); margin:0 auto 3px; width:min(100%,520px); }
@@ -536,7 +545,7 @@ body { min-height:100vh; background:radial-gradient(ellipse at 50% 12%,#173b58 0
               </g>
               <circle class="gauge-hub" cx="130" cy="127" r="8"/>
               <!-- Digitalanzeige bewusst tiefer als die Zeigernabe. -->
-              <rect class="gauge-digital" x="77" y="153" width="106" height="35" rx="7"/>
+              <rect class="gauge-digital" x="70" y="152" width="120" height="37" rx="7"/>
               <text id="my-saldo" class="saldo-amount" x="130" y="171">0,00 €</text>
               <text x="130" y="210" fill="#b8d0df" font-size="9" font-weight="900" text-anchor="middle" letter-spacing="1.6">GUTHABEN</text>
             </svg>
@@ -991,30 +1000,6 @@ body { min-height:100vh; background:radial-gradient(ellipse at 50% 12%,#173b58 0
     }
 
     let instrumentClockTimer = null;
-    let settlementConfigRefreshTimer = null;
-    let settlementConfigRefreshInFlight = null;
-
-    // Prüft regelmäßig auf eine neu veröffentlichte Spenderabrechnung,
-    // auch wenn die Kassen-App im Vordergrund geöffnet bleibt.
-    function startSettlementConfigRefresh() {
-        if (settlementConfigRefreshTimer) return;
-        settlementConfigRefreshTimer = setInterval(async () => {
-            if (!appReady || document.visibilityState !== "visible") return;
-            if (settlementConfigRefreshInFlight) return;
-            settlementConfigRefreshInFlight = (async () => {
-                const loaded = await loadPublicConfig();
-                if (!loaded) return;
-                updateSaldoDisplay();
-                refreshBirthdaySponsorUi();
-                checkPendingBirthdaySettlement();
-                flushEmailOutbox();
-            })();
-            try { await settlementConfigRefreshInFlight; }
-            catch (error) { console.warn("Aktualisierung der Kaffee-Abrechnung fehlgeschlagen:", error); }
-            finally { settlementConfigRefreshInFlight = null; }
-        }, 15000);
-    }
-
     async function startApp() {
         updateClockInstruments();
         if (!instrumentClockTimer) instrumentClockTimer = setInterval(updateClockInstruments, 15000);
@@ -1320,7 +1305,6 @@ body { min-height:100vh; background:radial-gradient(ellipse at 50% 12%,#173b58 0
         refreshBirthdaySponsorUi();
         checkPendingBirthdaySettlement();
         flushEmailOutbox();
-        startSettlementConfigRefresh();
     }
 
     function updateSaldoDisplay() {
