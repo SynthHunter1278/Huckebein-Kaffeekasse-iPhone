@@ -2,19 +2,21 @@
   "geburtstag": {
     "aktiv": true,
     "spender": "Uwe",
-    "datum": "2026-11-13",
-    "abrechnung": {
-      "id": "GEB-20261113-1794585174395",
-      "spender": "Uwe",
-      "datum": "2026-11-13",
-      "anzahl": 12,
-      "einzelpreis": 0.5,
-      "gesamt": 6,
-      "status": "offen",
-      "erstellt": "2026-11-13T15:52:54.395Z"
-    },
-    "archiv": [],
-    "aktionsId": "KAFFEE-20261113-1794642952895-B2MOE"
+    "datum": "2026-11-14",
+    "abrechnung": null,
+    "archiv": [
+      {
+        "id": "GEB-20261113-1794585174395",
+        "spender": "Uwe",
+        "datum": "2026-11-13",
+        "anzahl": 12,
+        "einzelpreis": 0.5,
+        "gesamt": 6,
+        "status": "offen",
+        "erstellt": "2026-11-13T15:52:54.395Z"
+      }
+    ],
+    "aktionsId": "KAFFEE-20261114-1794643559364-LSLK1"
   },
   "nachricht": {
     "aktiv": false,
