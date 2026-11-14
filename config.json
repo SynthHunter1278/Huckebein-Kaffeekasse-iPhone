@@ -11,7 +11,9 @@
       "einzelpreis": 0.5,
       "gesamt": 6,
       "status": "offen",
-      "erstellt": "2026-11-14T14:42:28.376Z"
+      "erstellt": "2026-11-14T14:42:28.376Z",
+      "erneutVeröffentlicht": "2026-11-14T15:06:00.729Z",
+      "erneutVeröffentlichtAnzahl": 1
     },
     "archiv": [
       {
