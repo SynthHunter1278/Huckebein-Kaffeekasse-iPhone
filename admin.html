@@ -42,26 +42,26 @@
     <div id="statusBox" class="status"></div>
 
     <div id="adminForm">
-        <h2>🎉 Freikaffee / Geburtstag</h2>
+        <h2>☕ Freikaffee-Aktion</h2>
         <div class="form-group flex-group">
             <label class="switch">
                 <input type="checkbox" id="freeCoffeeActive">
                 <span class="slider"></span>
             </label>
-            <span>Aktion aktiv (Kaffee für alle GRATIS)</span>
+            <span>Aktion aktiv (ein Gratis-Becher pro Teilnehmer)</span>
         </div>
         <div class="form-group">
-            <label for="freeCoffeeGiver">App-Anmeldename des Geburtstagsspenders:</label>
+            <label for="freeCoffeeGiver">App-Anmeldename des Kaffeespenders:</label>
             <input type="text" id="freeCoffeeGiver" placeholder="z. B. Pete" autocomplete="off">
             <p class="small-note">Den Namen exakt so eintragen, wie er in der Spenderanmeldung per E-Mail steht. Nur diese Kassen-App erhält später die persönliche Abrechnung.</p>
         </div>
         <div class="form-group">
-            <label for="freeCoffeeDate">Tag der Geburtstagsaktion:</label>
+            <label for="freeCoffeeDate">Tag der Kaffeeaktion:</label>
             <input type="date" id="freeCoffeeDate">
         </div>
-        <p class="small-note">Der Automatenkaffee ist am eingetragenen Tag automatisch von 06:00 bis 15:00 Uhr kostenlos. Andere Produkte bleiben kostenpflichtig.</p>
+        <p class="small-note">Am eingetragenen Tag kann jeder Teilnehmer über seine Kassen-App einmalig einen Becher Automatenkaffee von 06:00 bis 15:00 Uhr kostenlos abrufen. Weitere Kaffees und andere Produkte bleiben kostenpflichtig.</p>
 
-        <h2>🧾 Geburtstagskaffee-Abrechnung</h2>
+        <h2>🧾 Kaffee-Spenden-Abrechnung</h2>
         <div class="form-group">
             <label for="birthdayCoffeeCount">Gezählte Gratis-Kaffees (aus den E-Mails):</label>
             <input type="number" id="birthdayCoffeeCount" min="1" max="1000" step="1" placeholder="z. B. 24">
@@ -372,6 +372,18 @@
             const latestBirthday = latestConfig.geburtstag || latestConfig.freeCoffee || {};
             const selectedSpender = String(updatedConfig.geburtstag.spender || "").trim();
             const selectedDate = updatedConfig.geburtstag.datum;
+            const oldSpender = String(latestBirthday.spender || latestBirthday.giver || "").trim();
+            const oldDate = String(latestBirthday.datum || "");
+            const wasActive = Boolean(latestBirthday.aktiv ?? latestBirthday.active);
+            const isActive = Boolean(updatedConfig.geburtstag.aktiv);
+            const newActionStarted = isActive && !wasActive;
+            const actionIdentityChanged = oldSpender !== selectedSpender || oldDate !== selectedDate;
+            // Eine stabile Aktions-ID ermöglicht die Einmal-Sperre je Benutzer und Aktion.
+            // Sie bleibt bei normalen Preis-/Nachrichtenänderungen erhalten.
+            const existingActionId = String(latestBirthday.aktionsId || latestBirthday.id || "").trim();
+            updatedConfig.geburtstag.aktionsId = (!existingActionId || actionIdentityChanged || newActionStarted)
+                ? `KAFFEE-${String(selectedDate || localDateString()).replace(/-/g, "")}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
+                : existingActionId;
             let retainedSettlement = latestBirthday.abrechnung || null;
             // Beim Wechsel auf einen anderen Spender oder ein anderes Aktionsdatum
             // wird die alte Abrechnung archiviert und nicht dem neuen Geburtstag zugeordnet.
@@ -439,8 +451,8 @@
         const countRaw = document.getElementById("birthdayCoffeeCount").value;
         const count = Number(countRaw);
         const unitPrice = Number(document.getElementById("p_kaffee").value);
-        if (!spender) { showStatus("Bitte zuerst den App-Anmeldenamen des Geburtstagsspenders eintragen.", false); return; }
-        if (!eventDate) { showStatus("Bitte das Datum der Geburtstagsaktion eintragen.", false); return; }
+        if (!spender) { showStatus("Bitte zuerst den App-Anmeldenamen des Kaffeespenders eintragen.", false); return; }
+        if (!eventDate) { showStatus("Bitte das Datum der Kaffeeaktion eintragen.", false); return; }
         if (countRaw === "" || !Number.isInteger(count) || count < 1 || count > 1000) {
             showStatus("Bitte eine ganze Anzahl zwischen 1 und 1000 eintragen.", false); return;
         }
@@ -449,7 +461,7 @@
         }
         const endOfEvent = new Date(`${eventDate}T15:00:00`);
         if (Date.now() < endOfEvent.getTime()) {
-            showStatus("Die Abrechnung kann erst nach 15:00 Uhr am Aktionstag veröffentlicht werden.", false); return;
+            showStatus("Die Abrechnung kann erst nach 15:00 Uhr am Tag der Kaffeeaktion veröffentlicht werden.", false); return;
         }
 
         const publishButton = document.getElementById("publishBirthdayButton");
@@ -469,7 +481,7 @@
             }
 
             const total = Math.round(count * unitPrice * 100) / 100;
-            const settlementId = `GEB-${eventDate.replace(/-/g, "")}-${Date.now()}`;
+            const settlementId = `KAFFEE-${eventDate.replace(/-/g, "")}-${Date.now()}`;
             const settlement = {
                 id: settlementId,
                 spender,
@@ -495,7 +507,7 @@
             const response = await fetch(apiUrl(), {
                 method: "PUT",
                 headers: { ...githubHeaders(), "Content-Type": "application/json" },
-                body: JSON.stringify({ message: "Kaffeekasse: Geburtstagskaffee-Abrechnung veröffentlicht", content: contentBase64, sha: current.sha })
+                body: JSON.stringify({ message: "Kaffeekasse: Kaffee-Spenden-Abrechnung veröffentlicht", content: contentBase64, sha: current.sha })
             });
             const result = await readApiJson(response);
             currentSha = result.content?.sha || current.sha;

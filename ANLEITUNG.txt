@@ -1,0 +1,35 @@
+HANS HUCKEBEIN – KAFFEEAKTION
+Updatepaket: allgemeine Kaffee-Spende mit maximal einem Gratisbecher pro Teilnehmer und Aktion
+
+ENTHALTENE DATEIEN
+- index.html  Kassen-App mit Cockpit-Design, realistischem Hubschrauberbild und Kaffeeaktion
+- admin.html  Admin-App mit allgemeiner Kaffeeaktion und Aktions-ID
+- sw.js       Service Worker v7 (lädt neue index.html/config.json zuerst vom Server)
+
+EINBAU IN GITHUB
+1. Vorhandene Repository-Sicherung behalten (wie bereits von dir gemacht).
+2. Die drei Dateien index.html, admin.html und sw.js im Hauptverzeichnis des Repositorys ersetzen.
+3. Commit changes ausführen.
+4. Kassen-App auf den Geräten mit Internetverbindung neu öffnen. Der Service Worker v7 wird automatisch aktualisiert.
+5. config.json NICHT löschen oder ersetzen. Die vorhandenen Einstellungen bleiben erhalten.
+
+ABLAUF DER KAFFEEAKTION
+1. Teilnehmer öffnet in der Kassen-App „Kaffee spendieren“ und sendet die Anfrage.
+2. Die Admin-App erhält die EmailJS-Anmeldung mit dem vorhandenen App-Anmeldenamen.
+3. In der Admin-App Spender und Aktionstag eintragen, Aktion aktivieren und „Speichern & Live schalten“.
+4. Am Aktionstag ist von 06:00 bis 15:00 Uhr ein Becher Automatenkaffee gratis.
+5. Jeder Teilnehmer kann pro Aktion einen Gratisbecher abrufen. Der Abruf wird per EmailJS protokolliert.
+6. Nach 15:00 Uhr die Entnahmemeldungen zählen, die Anzahl in der Admin-App eintragen und die Abrechnung veröffentlichen.
+7. Nur die Kassen-App mit dem passenden Spendernamen zeigt die Abrechnung. Nach Bestätigung wird sie lokal einmalig vom Guthaben abgezogen.
+
+WICHTIGE GRENZE DER EINMAL-SPERRE
+Die Einmal-Sperre wird im lokalen Browser-Speicher anhand von App-Anmeldename und Aktions-ID geführt. Sie verhindert einen zweiten Gratisabruf auf demselben Browserprofil/Gerät. Da die bisherige App keine zentrale Datenbank besitzt und EmailJS nur E-Mails versendet, kann dieselbe Person die Sperre auf einem zweiten Gerät oder in einem anderen Browserprofil umgehen. Eine geräteübergreifende, technisch sichere Einmal-Sperre würde einen gemeinsamen beschreibbaren Speicher/Backend benötigen.
+
+KONFIGURATION UND EMAILJS
+- config.json bleibt erhalten. Die bisherige interne Konfigurationsstruktur „geburtstag“ wird aus Kompatibilitätsgründen weiterverwendet; in den Oberflächen steht nun „Kaffeeaktion“.
+- Die Admin-App ergänzt eine stabile aktionsId und erneuert sie bei einer neu gestarteten Aktion.
+- EmailJS-Template template_7an5vbo nutzt weiterhin die bereits eingerichteten Variablen subject, item, user, timestamp und notification_id.
+- Das separate PayPal-Template bleibt unverändert.
+
+TESTEMPFEHLUNG
+Zuerst mit zwei Testteilnehmern prüfen: beide je einen Gratisbecher abrufen, denselben Teilnehmer auf demselben Gerät ein zweites Mal versuchen lassen, E-Mail-Meldungen kontrollieren, danach mit einem Testbetrag die Abrechnung veröffentlichen und die Abbuchung auf dem Spendergerät prüfen.
