@@ -14,6 +14,8 @@
         input[type="text"], input[type="number"], input[type="date"], select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 15px; box-sizing: border-box; }
         .btn-publish { width:100%; padding:13px; border:0; border-radius:8px; background:#16a34a; color:#fff; font-size:15px; font-weight:bold; cursor:pointer; margin:8px 0 14px; }
         .btn-publish:disabled { opacity:.6; cursor:wait; }
+        .btn-resend { width:100%; padding:12px; border:1px solid #60a5fa; border-radius:8px; background:#1d4ed8; color:#fff; font-size:14px; font-weight:bold; cursor:pointer; margin:0 0 12px; }
+        .btn-resend:disabled { opacity:.6; cursor:wait; }
         .small-note { font-size:12px; color:#cbd5e1; line-height:1.45; }
         .settlement-preview { background:#1e293b; border:1px solid #475569; border-radius:8px; padding:12px; margin:8px 0; color:#e2e8f0; }
         .flex-group { display: flex; align-items: center; gap: 10px; }
@@ -68,6 +70,8 @@
         </div>
         <div class="settlement-preview" id="birthdaySettlementPreview">Bitte nach Ende der Freiphase die Entnahmemeldungen zählen und die Anzahl eintragen.</div>
         <button type="button" class="btn-publish" id="publishBirthdayButton" onclick="publishBirthdaySettlement()">🧾 Abrechnung veröffentlichen</button>
+        <button type="button" class="btn-resend" id="resendBirthdayButton" onclick="resendBirthdaySettlement()">↻ Vorhandene Abrechnung erneut zustellen</button>
+        <p class="small-note">„Erneut zustellen“ veröffentlicht dieselbe offene Abrechnung mit derselben Abrechnungs-ID erneut. Dadurch wird sie auf dem Spendergerät erneut abgefragt, ohne auf demselben Gerät ein zweites Mal abzubuchen.</p>
         <p class="small-note">Die Admin-App berechnet den Betrag aus Anzahl × normalem Kaffeepreis und veröffentlicht ihn in config.json. Der Spender bestätigt die Abbuchung in seiner eigenen Kassen-App.</p>
 
         <h2>📢 Nachricht an alle</h2>
@@ -519,6 +523,70 @@
         } finally {
             publishButton.disabled = false;
             publishButton.textContent = "🧾 Abrechnung veröffentlichen";
+        }
+    }
+
+    // Erneute Zustellung nutzt dieselbe Abrechnungs-ID. Auf dem Spendergerät
+    // verhindert diese ID eine zweite Abbuchung, falls die Abrechnung dort bereits
+    // bestätigt wurde. Die Konfiguration wird trotzdem neu veröffentlicht, damit
+    // eine bislang nicht angekommene Abrechnung erneut abgefragt werden kann.
+    async function resendBirthdaySettlement() {
+        if (!checkCredentials()) return;
+        const button = document.getElementById("resendBirthdayButton");
+        button.disabled = true;
+        button.textContent = "⏳ Stelle vorhandene Abrechnung erneut zu...";
+        try {
+            const getResponse = await fetchGetWithRetry(apiUrl() + "?cb=" + Date.now(), {
+                method: "GET", headers: githubHeaders(), cache: "no-store"
+            }, 3);
+            const current = await readApiJson(getResponse);
+            if (!current.sha || !current.content) throw new Error("GitHub lieferte keine vollständige config.json.");
+            const latestConfig = JSON.parse(decodeBase64Utf8(current.content));
+            const birthday = latestConfig.geburtstag || latestConfig.freeCoffee || {};
+            const existing = birthday.abrechnung || null;
+            if (!existing || existing.status !== "offen") {
+                throw new Error("Es gibt keine offene Abrechnung, die erneut zugestellt werden kann.");
+            }
+            const count = Number(existing.anzahl) || 0;
+            const total = Number(existing.gesamt);
+            const safeTotal = Number.isFinite(total) ? total : count * (Number(existing.einzelpreis) || 0);
+            const id = String(existing.id || "").trim();
+            if (!id) throw new Error("Die vorhandene Abrechnung besitzt keine Abrechnungs-ID. Bitte nicht neu veröffentlichen, bevor das geprüft wurde.");
+            const spender = String(existing.spender || birthday.spender || "").trim();
+            const dateLabel = String(existing.datum || "");
+            const approved = confirm(
+                `Vorhandene Abrechnung erneut zustellen?\n\nSpender: ${spender}\nDatum: ${dateLabel}\nKaffees: ${count}\nBetrag: ${safeTotal.toFixed(2).replace(".", ",")} €\nAbrechnungs-ID: ${id}\n\nDie Abrechnungs-ID bleibt unverändert. Auf demselben Gerät wird dadurch nicht erneut abgebucht.`
+            );
+            if (!approved) return;
+
+            const updatedSettlement = {
+                ...existing,
+                erneutVeröffentlicht: new Date().toISOString(),
+                erneutVeröffentlichtAnzahl: (Number(existing.erneutVeröffentlichtAnzahl) || 0) + 1
+            };
+            const finalConfig = {
+                ...latestConfig,
+                geburtstag: { ...birthday, abrechnung: updatedSettlement }
+            };
+            const contentBase64 = btoa(Array.from(new TextEncoder().encode(JSON.stringify(finalConfig, null, 2)), b => String.fromCharCode(b)).join(""));
+            const putResponse = await fetch(apiUrl(), {
+                method: "PUT",
+                headers: { ...githubHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: `Kaffeekasse: offene Abrechnung ${id} erneut zugestellt`,
+                    content: contentBase64,
+                    sha: current.sha
+                })
+            });
+            const result = await readApiJson(putResponse);
+            currentSha = result.content?.sha || current.sha;
+            loadedConfig = finalConfig;
+            showStatus(`Die offene Abrechnung für ${spender} wurde mit derselben ID (${id}) erneut veröffentlicht. Die Kassen-App fragt sie spätestens beim nächsten Aktualisieren ab.`, true);
+        } catch (error) {
+            showStatus("Erneute Zustellung fehlgeschlagen: " + error.message, false);
+        } finally {
+            button.disabled = false;
+            button.textContent = "↻ Vorhandene Abrechnung erneut zustellen";
         }
     }
 
