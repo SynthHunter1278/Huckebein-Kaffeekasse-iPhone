@@ -1,8 +1,8 @@
 {
   "geburtstag": {
-    "aktiv": true,
+    "aktiv": false,
     "spender": "Uwe",
-    "datum": "2026-11-14",
+    "datum": "2026-11-13",
     "abrechnung": null,
     "archiv": [
       {
@@ -19,7 +19,7 @@
     "aktionsId": "KAFFEE-20261114-1794643559364-LSLK1"
   },
   "nachricht": {
-    "aktiv": false,
+    "aktiv": true,
     "text": "Schönes Wochenende",
     "typ": "info"
   },
