@@ -17,7 +17,7 @@
     "aktionsId": "KAFFEE-20261113-1794642952895-B2MOE"
   },
   "nachricht": {
-    "aktiv": true,
+    "aktiv": false,
     "text": "Schönes Wochenende",
     "typ": "info"
   },
