@@ -1,6 +1,6 @@
 {
   "geburtstag": {
-    "aktiv": false,
+    "aktiv": true,
     "spender": "Uwe",
     "datum": "2026-11-13",
     "abrechnung": {
@@ -13,7 +13,8 @@
       "status": "offen",
       "erstellt": "2026-11-13T15:52:54.395Z"
     },
-    "archiv": []
+    "archiv": [],
+    "aktionsId": "KAFFEE-20261113-1794642952895-B2MOE"
   },
   "nachricht": {
     "aktiv": true,
