@@ -1,8 +1,8 @@
-// Huckebein-Kaffeekasse – Service Worker v7
+// Huckebein-Kaffeekasse – Service Worker v8
 // Neue HTML-Versionen und config.json werden zuerst direkt vom Server geladen.
 // Der Cache dient als Rückfallebene bei fehlender Internetverbindung.
 
-const CACHE_NAME = "huckebein-kaffeekasse-v7";
+const CACHE_NAME = "huckebein-kaffeekasse-v8";
 const APP_FILES = ["./", "./index.html", "./config.json", "./manifest.json", "./icon.png"];
 const APP_URL = new URL("./index.html", self.registration.scope).href;
 const ROOT_URL = self.registration.scope;

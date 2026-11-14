@@ -991,6 +991,30 @@ body { min-height:100vh; background:radial-gradient(ellipse at 50% 12%,#173b58 0
     }
 
     let instrumentClockTimer = null;
+    let settlementConfigRefreshTimer = null;
+    let settlementConfigRefreshInFlight = null;
+
+    // Prüft regelmäßig auf eine neu veröffentlichte Spenderabrechnung,
+    // auch wenn die Kassen-App im Vordergrund geöffnet bleibt.
+    function startSettlementConfigRefresh() {
+        if (settlementConfigRefreshTimer) return;
+        settlementConfigRefreshTimer = setInterval(async () => {
+            if (!appReady || document.visibilityState !== "visible") return;
+            if (settlementConfigRefreshInFlight) return;
+            settlementConfigRefreshInFlight = (async () => {
+                const loaded = await loadPublicConfig();
+                if (!loaded) return;
+                updateSaldoDisplay();
+                refreshBirthdaySponsorUi();
+                checkPendingBirthdaySettlement();
+                flushEmailOutbox();
+            })();
+            try { await settlementConfigRefreshInFlight; }
+            catch (error) { console.warn("Aktualisierung der Kaffee-Abrechnung fehlgeschlagen:", error); }
+            finally { settlementConfigRefreshInFlight = null; }
+        }, 15000);
+    }
+
     async function startApp() {
         updateClockInstruments();
         if (!instrumentClockTimer) instrumentClockTimer = setInterval(updateClockInstruments, 15000);
@@ -1296,6 +1320,7 @@ body { min-height:100vh; background:radial-gradient(ellipse at 50% 12%,#173b58 0
         refreshBirthdaySponsorUi();
         checkPendingBirthdaySettlement();
         flushEmailOutbox();
+        startSettlementConfigRefresh();
     }
 
     function updateSaldoDisplay() {

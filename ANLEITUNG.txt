@@ -1,0 +1,23 @@
+HANS HUCKEBEIN – KORREKTUR DER KAFFEE-SPENDEN-ABRECHNUNG
+
+Warum dieses Update nötig ist
+Die bisher bei GitHub veröffentlichte admin.html enthielt noch nicht die Abrechnungsfunktion. Daher wurde in config.json kein Objekt geburtstag.abrechnung veröffentlicht, das die Spender-App anzeigen könnte.
+
+Einbau
+1. Diese drei Dateien im Hauptverzeichnis des GitHub-Repositorys ersetzen: admin.html, index.html und sw.js.
+2. Commit changes ausführen.
+3. Admin-App neu laden (am PC Strg+F5).
+4. Prüfen, ob der Bereich „Kaffee-Spenden-Abrechnung“ vorhanden ist.
+5. Spendername und Aktionsdatum prüfen, gezählte Gratis-Kaffees eintragen und „Abrechnung veröffentlichen“ drücken.
+6. Auf dem Spendergerät die Kassen-App geöffnet lassen oder neu öffnen. Sie prüft nun alle 15 Sekunden auf eine neue Abrechnung.
+
+Wichtig
+- config.json NICHT manuell ersetzen oder überschreiben. Die Admin-App schreibt die Abrechnung beim Veröffentlichen in die bestehende config.json.
+- Der Spendername muss dem gespeicherten App-Anmeldenamen entsprechen (Groß-/Kleinschreibung und mehrfache Leerzeichen sind unkritisch).
+- Der neue Service Worker verwendet Cache-Version v8.
+- Die Abbuchung erfolgt erst, wenn der Spender die Abrechnung in seiner Kassen-App bestätigt.
+
+Enthaltene Dateien
+- admin.html: Abrechnung veröffentlichen und Status speichern
+- index.html: persönliche Spenderabrechnung, Guthabenabbuchung, regelmäßige Aktualisierung
+- sw.js: Cache-Version v8, Netzwerk zuerst für index.html und config.json
